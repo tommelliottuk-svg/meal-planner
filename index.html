@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Our Kitchen — Meal Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FCF8F2;
+    --card:#FFFFFF;
+    --ink:#2B2520;
+    --ink-soft:#7A6F65;
+    --line:#EBE2D6;
+    --jam:#B23A66;        /* primary accent: jam berry */
+    --jam-deep:#8E2A50;
+    --sage:#6F8F62;       /* secondary accent: herb */
+    --butter:#F6D9A8;
+    --jam-tint:#FBEAF0;
+    --sage-tint:#EDF2E8;
+    --shadow:0 1px 2px rgba(43,37,32,.05), 0 8px 24px -12px rgba(43,37,32,.18);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Nunito Sans", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.45;
+    padding-bottom:88px;
+  }
+  /* gingham signature band */
+  .gingham{
+    height:10px;
+    background:
+      repeating-linear-gradient(90deg, rgba(178,58,102,.18) 0 12px, rgba(178,58,102,.07) 12px 24px),
+      repeating-linear-gradient(0deg, rgba(178,58,102,.18) 0 12px, rgba(178,58,102,.07) 12px 24px);
+    background-blend-mode:multiply;
+  }
+  header.app{
+    padding:22px 20px 14px;
+    max-width:680px;margin:0 auto;
+  }
+  .eyebrow{
+    font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--jam);
+  }
+  h1{
+    font-family:"Fraunces", Georgia, serif;
+    font-weight:600;font-size:34px;line-height:1.02;letter-spacing:-.01em;
+    margin:4px 0 6px;
+  }
+  h1 .amp{color:var(--jam)}
+  .sub{color:var(--ink-soft);font-size:15px;margin:0}
+  .progress{
+    margin-top:14px;display:flex;align-items:center;gap:10px;
+    font-size:13px;color:var(--ink-soft);font-weight:600;
+  }
+  .bar{flex:1;height:8px;background:var(--line);border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--sage),var(--jam));border-radius:999px;transition:width .4s ease}
+
+  /* tabs */
+  .tabs{max-width:680px;margin:6px auto 0;padding:0 20px;display:flex;gap:8px}
+  .tab{
+    appearance:none;border:1px solid var(--line);background:var(--card);
+    font:inherit;font-weight:700;font-size:14px;color:var(--ink-soft);
+    padding:9px 16px;border-radius:999px;cursor:pointer;transition:.15s;
+  }
+  .tab[aria-selected="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tab:focus-visible{outline:3px solid var(--jam-tint);outline-offset:2px}
+
+  main{max-width:680px;margin:0 auto;padding:16px 20px}
+
+  /* month divider */
+  .month{
+    display:flex;align-items:baseline;gap:10px;margin:26px 2px 12px;
+  }
+  .month:first-child{margin-top:8px}
+  .month h2{
+    font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:20px;margin:0;
+  }
+  .month span{font-size:12px;color:var(--ink-soft);font-weight:700;letter-spacing:.04em}
+  .month .rule{flex:1;height:1px;background:var(--line)}
+
+  /* day ticket */
+  .day{
+    display:flex;align-items:center;gap:14px;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow);
+    cursor:pointer;transition:transform .12s ease, box-shadow .12s ease, border-color .12s;
+    animation:rise .4s ease both;
+  }
+  .day:hover{transform:translateY(-1px)}
+  .day:focus-within{border-color:var(--jam)}
+  .day.today{border-color:var(--jam);box-shadow:0 0 0 3px var(--jam-tint), var(--shadow)}
+  .day.empty .meal-name{color:var(--ink-soft);font-style:italic;font-family:"Nunito Sans",sans-serif;font-weight:600;font-size:15px}
+
+  .datecol{width:48px;text-align:center;flex:none}
+  .dow{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--jam)}
+  .dnum{font-family:"Fraunces",Georgia,serif;font-size:24px;font-weight:600;line-height:1}
+  .day.today .dow{color:var(--jam-deep)}
+
+  .plate{
+    width:52px;height:52px;flex:none;border-radius:50%;
+    background:radial-gradient(circle at 50% 38%, #fff, var(--sage-tint));
+    border:1px solid var(--line);
+    display:grid;place-items:center;font-size:27px;
+    box-shadow:inset 0 -3px 6px rgba(0,0,0,.04);
+  }
+  .day.empty .plate{background:repeating-conic-gradient(var(--line) 0 8deg, #fff 8deg 16deg);opacity:.5;font-size:20px}
+
+  .body{flex:1;min-width:0}
+  .meal-name{
+    font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:18px;line-height:1.15;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .today-flag{
+    display:inline-block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    color:#fff;background:var(--jam);padding:2px 7px;border-radius:999px;margin-left:4px;vertical-align:middle;
+  }
+  .nudge{display:flex;flex-direction:column;gap:3px;flex:none}
+  .nudge button{
+    appearance:none;border:1px solid var(--line);background:var(--paper);
+    width:38px;height:30px;border-radius:9px;cursor:pointer;color:var(--ink-soft);
+    display:grid;place-items:center;padding:0;transition:.12s;
+  }
+  .nudge button:hover:not(:disabled){background:var(--jam-tint);color:var(--jam);border-color:var(--jam)}
+  .nudge button:disabled{opacity:.3;cursor:default}
+  .nudge svg{width:12px;height:12px}
+
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* meals library view */
+  .libwrap{display:none}
+  .libwrap.show{display:block}
+  .schedwrap.hide{display:none}
+  .lib-add{
+    display:flex;gap:8px;margin:6px 0 18px;
+  }
+  .lib-add input{
+    flex:1;font:inherit;font-size:16px;padding:13px 15px;border:1px solid var(--line);
+    border-radius:14px;background:var(--card);color:var(--ink);
+  }
+  .lib-add input:focus{outline:3px solid var(--jam-tint);border-color:var(--jam)}
+  .libitem{
+    display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:10px 12px;margin-bottom:9px;box-shadow:var(--shadow);
+  }
+  .libitem .plate{width:44px;height:44px;font-size:23px}
+  .libitem .ln{flex:1;font-family:"Fraunces",serif;font-weight:600;font-size:17px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .libitem .uses{font-size:12px;color:var(--ink-soft);font-weight:700}
+  .iconbtn{
+    appearance:none;border:1px solid var(--line);background:var(--paper);width:36px;height:36px;
+    border-radius:10px;display:grid;place-items:center;cursor:pointer;color:var(--ink-soft);transition:.12s;
+  }
+  .iconbtn:hover{background:var(--jam-tint);color:var(--jam);border-color:var(--jam)}
+  .iconbtn svg{width:16px;height:16px}
+
+  .empty-state{
+    text-align:center;color:var(--ink-soft);padding:40px 20px;
+  }
+  .empty-state .big{font-size:40px;margin-bottom:8px}
+
+  /* primary button */
+  .btn{
+    appearance:none;border:none;font:inherit;font-weight:800;font-size:15px;cursor:pointer;
+    background:var(--jam);color:#fff;padding:13px 18px;border-radius:14px;transition:.15s;
+  }
+  .btn:hover{background:var(--jam-deep)}
+  .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  .btn.ghost:hover{background:var(--paper)}
+  .btn.danger{background:var(--card);color:var(--jam);border:1px solid var(--jam-tint)}
+  .btn:focus-visible{outline:3px solid var(--jam-tint);outline-offset:2px}
+
+  /* bottom sheet editor */
+  .scrim{
+    position:fixed;inset:0;background:rgba(43,37,32,.4);opacity:0;pointer-events:none;
+    transition:opacity .2s;z-index:40;
+  }
+  .scrim.open{opacity:1;pointer-events:auto}
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:50;
+    background:var(--paper);border-radius:24px 24px 0 0;
+    padding:8px 20px calc(22px + env(safe-area-inset-bottom));
+    transform:translateY(110%);transition:transform .26s cubic-bezier(.3,.8,.3,1);
+    max-width:680px;margin:0 auto;box-shadow:0 -10px 40px -16px rgba(43,37,32,.4);
+    max-height:88vh;overflow:auto;
+  }
+  .sheet.open{transform:none}
+  .grip{width:40px;height:5px;background:var(--line);border-radius:99px;margin:8px auto 14px}
+  .sheet h3{font-family:"Fraunces",serif;font-size:13px;font-weight:700;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--jam);margin:0 0 4px}
+  .sheet .dlabel{font-family:"Fraunces",serif;font-size:22px;font-weight:600;margin:0 0 16px}
+  .field-row{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+  .preview-plate{width:56px;height:56px;flex:none}
+  .field-row input.name{
+    flex:1;font:inherit;font-size:17px;padding:14px 16px;border:1px solid var(--line);
+    border-radius:14px;background:var(--card);color:var(--ink);font-family:"Fraunces",serif;font-weight:600;
+  }
+  .field-row input.name:focus{outline:3px solid var(--jam-tint);border-color:var(--jam)}
+
+  .lbl{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin:16px 0 8px}
+  .emoji-pick{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+  .emoji-pick button{
+    flex:none;width:46px;height:46px;border-radius:12px;border:1px solid var(--line);
+    background:var(--card);font-size:24px;cursor:pointer;transition:.12s;display:grid;place-items:center;
+  }
+  .emoji-pick button[aria-pressed="true"]{border-color:var(--jam);background:var(--jam-tint);transform:scale(1.05)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    appearance:none;border:1px solid var(--line);background:var(--card);font:inherit;font-weight:700;
+    font-size:14px;padding:9px 13px;border-radius:999px;cursor:pointer;color:var(--ink);
+    display:inline-flex;align-items:center;gap:7px;transition:.12s;
+  }
+  .chip:hover{border-color:var(--jam);background:var(--jam-tint)}
+  .chip .em{font-size:16px}
+  .sheet-actions{display:flex;gap:10px;margin-top:22px}
+  .sheet-actions .btn{flex:1}
+
+  .saving{
+    position:fixed;bottom:14px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;font-weight:700;font-size:13px;padding:9px 16px;border-radius:999px;
+    opacity:0;transition:.25s;z-index:60;pointer-events:none;
+  }
+  .saving.show{opacity:1;transform:translateX(-50%)}
+
+  footer{max-width:680px;margin:10px auto 0;padding:0 20px 24px;color:var(--ink-soft);font-size:12px}
+
+  /* who + last updated */
+  .meta-line{max-width:680px;margin:0 auto;padding:6px 20px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .you-chip{appearance:none;border:1px solid var(--line);background:var(--card);font:inherit;font-weight:700;
+    font-size:12px;color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.12s}
+  .you-chip:hover{border-color:var(--jam);background:var(--jam-tint)}
+  .you-chip .dotme{width:8px;height:8px;border-radius:50%;background:var(--sage)}
+  .meta-upd{font-size:12px;color:var(--ink-soft);font-weight:600}
+  .conn-chip{appearance:none;border:none;font:inherit;font-weight:800;font-size:11px;letter-spacing:.02em;
+    padding:6px 11px;border-radius:999px;cursor:pointer;margin-left:auto;white-space:nowrap;transition:.12s}
+  .conn-chip.ok{background:var(--sage-tint);color:#3f6b34}
+  .conn-chip.warn{background:#FBE3D2;color:#9A4A1F}
+  .conn-chip:hover{filter:brightness(.96)}
+
+  /* recipe-location tag */
+  .src-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.01em;
+    color:var(--ink-soft);background:var(--paper);border:1px solid var(--line);padding:2px 8px;border-radius:999px;
+    margin-top:5px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .src-tag::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--dot,#999);flex:none}
+
+  /* recipe-location select in editor */
+  .src-select{position:relative;margin-top:2px}
+  .src-select select{
+    width:100%;font:inherit;font-size:16px;font-weight:600;color:var(--ink);
+    padding:13px 40px 13px 15px;border:1px solid var(--line);border-radius:14px;background:var(--card);
+    appearance:none;-webkit-appearance:none;cursor:pointer;
+  }
+  .src-select select:focus{outline:3px solid var(--jam-tint);border-color:var(--jam)}
+  .src-select::after{content:'▾';position:absolute;right:16px;top:50%;transform:translateY(-50%);
+    color:var(--ink-soft);pointer-events:none;font-size:14px}
+
+  /* leaderboard */
+  .lead-head{display:flex;align-items:baseline;justify-content:space-between;margin:2px 2px 14px}
+  .lead-head h2{font-family:"Fraunces",serif;font-weight:600;font-size:20px;margin:0}
+  .lead-head .sm{font-size:12px;color:var(--ink-soft);font-weight:700}
+  .rank{width:30px;flex:none;text-align:center;font-family:"Fraunces",serif;font-weight:600;font-size:17px;color:var(--ink-soft)}
+  .rank .medal{font-size:22px}
+  .libitem.top{border-color:var(--butter);box-shadow:0 0 0 2px #FBEFD4, var(--shadow)}
+  .count-badge{display:inline-flex;align-items:center;font-weight:800;font-size:13px;color:var(--jam);
+    background:var(--jam-tint);padding:4px 9px;border-radius:999px;flex:none}
+
+  @media (max-width:420px){
+    h1{font-size:29px}
+    .meal-name{font-size:16px}
+    .plate{width:46px;height:46px;font-size:24px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important}
+  }
+</style>
+</head>
+<body>
+  <div class="gingham"></div>
+
+  <header class="app">
+    <div class="eyebrow">What's cooking</div>
+    <h1>Our Kitchen <span class="amp">·</span> Meal Plan</h1>
+    <p class="sub">Plan a meal for every day, swap them around, build your go-to list. Everything saves on its own.</p>
+    <div class="progress">
+      <div class="bar"><i id="barFill" style="width:0%"></i></div>
+      <span id="progressTxt">0 days planned</span>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tabSched" role="tab" aria-selected="true">📅 Schedule</button>
+    <button class="tab" id="tabLib" role="tab" aria-selected="false">🏆 Favourites</button>
+  </div>
+
+  <div class="meta-line">
+    <button class="you-chip" id="youChip"><span class="dotme"></span>Who are you? Tap to set</button>
+    <span class="meta-upd" id="metaUpd"></span>
+    <button class="conn-chip warn" id="connChip" title="Tap for connection help">⚠️ This device only</button>
+  </div>
+
+  <main>
+    <section class="schedwrap" id="schedWrap"></section>
+
+    <section class="libwrap" id="libWrap">
+      <div class="lib-add">
+        <input id="libInput" type="text" placeholder="Add a meal you're down to cook…" autocomplete="off" />
+        <button class="btn" id="libAddBtn">Add</button>
+      </div>
+      <div id="libList"></div>
+    </section>
+  </main>
+
+  <footer>
+    Tip: tap any day to plan or change its meal. Use the ▲▼ arrows to shuffle a meal to a nearby day.
+  </footer>
+
+  <!-- editor sheet -->
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Edit meal">
+    <div class="grip"></div>
+    <h3 id="sheetKicker">Plan this day</h3>
+    <p class="dlabel" id="sheetDate">—</p>
+
+    <div class="field-row">
+      <div class="plate preview-plate" id="previewPlate">🍽️</div>
+      <input class="name" id="mealInput" type="text" placeholder="What's for dinner?" autocomplete="off" />
+    </div>
+
+    <div class="lbl">Pick an icon</div>
+    <div class="emoji-pick" id="emojiPick"></div>
+
+    <div class="lbl">Recipe location</div>
+    <div class="src-select"><select id="srcSelect"></select></div>
+
+    <div class="lbl" id="repeatLbl">From your meals</div>
+    <div class="chips" id="repeatChips"></div>
+
+    <div class="sheet-actions">
+      <button class="btn danger" id="clearBtn">Clear day</button>
+      <button class="btn ghost" id="cancelBtn">Cancel</button>
+      <button class="btn" id="saveBtn">Save</button>
+    </div>
+  </div>
+
+  <div class="saving" id="savingPill">Saved ✓</div>
+
+<script>
+/* ---------- tiny SVG icons ---------- */
+const ICON = {
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>'
+};
+
+/* ---------- emoji matcher: turns a meal name into a cute icon ---------- */
+const EMOJI_RULES = [
+  [/pizza/,'🍕'],[/lasagn|spaghett|bolognese|carbonara|penne|fettucc|pasta|macaroni|mac\s?(and|&)?\s?cheese|gnocchi|ravioli/,'🍝'],
+  [/ramen|pho|noodle|pad\s?thai|udon|soba|lo\s?mein|chow\s?mein/,'🍜'],
+  [/sushi|sashimi|maki|poke|nigiri/,'🍣'],
+  [/taco|fajita/,'🌮'],[/burrito|quesadilla|enchilada|wrap/,'🌯'],
+  [/curry|tikka|masala|korma|biryani|vindaloo|dal|daal|lentil/,'🍛'],
+  [/risotto|paella|jambalaya|fried\s?rice|rice\s?bowl|\brice\b/,'🍚'],
+  [/burger|cheeseburger|slider/,'🍔'],[/hot\s?dog|sausage roll|brat/,'🌭'],
+  [/sandwich|panini|\bsub\b|club|blt|toastie/,'🥪'],
+  [/salad|caesar|slaw|cobb/,'🥗'],
+  [/soup|broth|chowder|bisque|gazpacho|minestrone/,'🍲'],
+  [/stew|casserole|hot\s?pot|hotpot|gumbo|chili|chilli|tagine|goulash|shepherd|cottage pie/,'🍲'],
+  [/steak|sirloin|ribeye|\bbeef\b|brisket|short rib/,'🥩'],
+  [/roast chicken|grilled chicken|fried chicken|\bchicken\b|wings|nugget/,'🍗'],
+  [/salmon|cod|tuna|haddock|halibut|trout|\bfish\b|seafood/,'🐟'],
+  [/shrimp|prawn/,'🦐'],[/crab|lobster/,'🦞'],[/oyster|mussel|clam/,'🦪'],
+  [/omelette|omelet|frittata|shakshuka|scrambl|\beggs?\b/,'🍳'],
+  [/pancake/,'🥞'],[/waffle/,'🧇'],[/bacon/,'🥓'],
+  [/breakfast|brunch/,'🍳'],
+  [/fries|chips\b/,'🍟'],[/potato|mash|jacket/,'🥔'],
+  [/dumpling|gyoza|potsticker|dim\s?sum|bao/,'🥟'],
+  [/\bpie\b|quiche|pasty/,'🥧'],
+  [/bread|toast|bagel|baguette/,'🍞'],
+  [/cheese|nacho|fondue|raclette/,'🧀'],
+  [/bbq|barbecue|grill|ribs|pulled pork/,'🍖'],[/\bpork\b|gammon|ham\b/,'🥩'],
+  [/kebab|shawarma|gyro|souvlaki|doner/,'🥙'],[/falafel|meatball|kofta/,'🧆'],
+  [/stir\s?fry|stir-?fry/,'🥡'],[/teriyaki|katsu|bento/,'🍱'],
+  [/lamb|mutton/,'🍖'],[/turkey/,'🦃'],[/duck/,'🦆'],
+  [/tofu|tempeh/,'🍱'],[/broccoli|veg|veggie|vegetable|greens/,'🥦'],
+  [/avocado|guac/,'🥑'],[/corn/,'🌽'],[/pepper|chilli pepper/,'🌶️'],
+  [/sweet|dessert|cake|brownie|cookie|pudding/,'🍰'],
+];
+function mealEmoji(name){
+  const n=(name||'').toLowerCase();
+  for(const [re,em] of EMOJI_RULES){ if(re.test(n)) return em; }
+  return '🍽️';
+}
+/* curated picker palette */
+const EMOJI_PALETTE=['🍝','🍕','🌮','🍛','🍣','🍜','🥗','🍲','🍔','🥩','🍗','🐟','🍚','🥘','🍳','🥪','🥟','🍱','🥦','🌯','🍖','🥙','🥡','🍰','🍽️'];
+
+/* ---------- storage layer ----------
+   Priority:
+   1) Cloudflare backend at /api/plan  -> one shared, synced plan (both phones see the same thing)
+   2) window.storage                   -> Claude's artifact preview
+   3) localStorage                     -> plain static host / opened as a local file
+   A local copy is always kept as backup so an edit is never lost. */
+const KEY='kitchen-planner:v1';
+let mem=null;
+let serverMode=false;
+let appPassword=null;
+const hasClaudeStore=(typeof window!=='undefined' && window.storage && typeof window.storage.get==='function');
+try{ appPassword=localStorage.getItem('kp-pw')||null; }catch(e){}
+
+function authHeaders(extra){ const h=Object.assign({},extra||{}); if(appPassword) h['X-App-Password']=appPassword; return h; }
+
+/* connection status: 'synced' (shared backend) or 'local' (this device only).
+   connWhy explains a local fallback so the page can tell the user what to fix. */
+let connState='local', connWhy='';
+
+async function apiProbe(){
+  let res;
+  try{ res=await fetch('/api/plan',{headers:authHeaders(),cache:'no-store'}); }
+  catch(e){ return {network:false}; }
+  const ct=res.headers.get('content-type')||'';
+  let text=''; try{ text=await res.text(); }catch(e){}
+  return {status:res.status, ok:res.ok, ct, text};
+}
+async function apiSave(data){
+  const res=await fetch('/api/plan',{method:'PUT',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify(data)});
+  if(!res.ok) throw new Error('save '+res.status);
+}
+
+async function loadData(){
+  let p=await apiProbe();
+  if(p.status===401){
+    // backend + binding are fine; it just needs the shared password
+    if(appPassword){ appPassword=null; try{localStorage.removeItem('kp-pw');}catch(e){} }
+    const pw=prompt('Enter the shared password for your meal plan:');
+    if(pw){
+      appPassword=pw; try{localStorage.setItem('kp-pw',pw);}catch(e){}
+      p=await apiProbe();
+      if(p.status===401){ appPassword=null; try{localStorage.removeItem('kp-pw');}catch(e){} connWhy='badpw'; }
+    } else { connWhy='badpw'; }
+  }
+  if(p.ok){
+    serverMode=true; connState='synced'; connWhy=''; renderConn();
+    let serverData=null;
+    if(p.text && p.text!=='null'){ try{ serverData=JSON.parse(p.text); }catch(e){} }
+    let localData=null;
+    try{ const s=localStorage.getItem(KEY); if(s) localData=JSON.parse(s); }catch(e){}
+    const serverPlanned = (serverData && serverData.plan) ? Object.keys(serverData.plan).length : 0;
+    const localHasMeals = localData && Array.isArray(localData.meals) && localData.meals.length>0;
+    // If the shared store already has a real plan, it is the source of truth.
+    if(serverData && serverData.meals && serverPlanned>0) return serverData;
+    // Otherwise, if this device has meals saved on it, lift them up to the shared store.
+    if(localHasMeals){
+      try{ await apiSave(localData); }catch(e){}
+      return localData;
+    }
+    return serverData; // null -> caller seeds, and the seed gets pushed to the shared store
+  }
+  // diagnose why the shared backend isn't usable
+  if(connWhy!=='badpw'){
+    if(p.network===false) connWhy='network';
+    else if(p.status===404 || (p.ct && p.ct.indexOf('text/html')>-1)) connWhy='nofunc';
+    else if(p.status===500 && /not bound/i.test(p.text||'')) connWhy='nobind';
+    else if(p.status) connWhy='http'+p.status;
+  }
+  connState='local'; renderConn();
+  // keep working with a local copy so nothing is lost
+  if(hasClaudeStore){ try{ const r=await window.storage.get(KEY); if(r&&r.value) return JSON.parse(r.value);}catch(e){} }
+  try{ const s=localStorage.getItem(KEY); if(s) return JSON.parse(s);}catch(e){}
+  return mem;
+}
+let saveTimer=null;
+async function saveData(data){
+  data.meta={by:myName||null, at:Date.now()};
+  mem=data;
+  renderMeta();
+  try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+  if(hasClaudeStore){ try{ window.storage.set(KEY, JSON.stringify(data), false);}catch(e){} }
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    if(serverMode){
+      try{ await apiSave(data); connState='synced'; renderConn(); flashSaved('Synced'); return; }
+      catch(e){ connState='local'; connWhy=connWhy||'savefail'; renderConn(); flashSaved('Saved on device'); return; }
+    }
+    flashSaved('Saved');
+  },350);
+}
+function renderConn(){
+  const el=document.getElementById('connChip'); if(!el) return;
+  if(connState==='synced'){ el.className='conn-chip ok'; el.textContent='☁️ Synced'; }
+  else { el.className='conn-chip warn'; el.textContent='⚠️ This device only'; }
+}
+function connHelp(){
+  if(connState==='synced'){ alert('Connected to your shared plan — edits sync to both devices.'); return; }
+  const msgs={
+    nofunc:'No backend found at /api/plan.\n\nThe "functions" folder likely isn\'t at the top level of your upload. Re-upload so index.html and the functions folder sit side by side at the root, then redeploy.',
+    nobind:'The backend is running but the KV store isn\'t attached.\n\nPages project → Settings → Bindings → Add → KV namespace. Set the Variable name to exactly PLAN_KV, pick your namespace, then REDEPLOY.',
+    badpw:'The password didn\'t match, so it\'s saving on this device only. Reload the page and enter the shared password again.',
+    network:'No backend reachable from here. That\'s normal in the preview or when opening the file directly — on your Cloudflare URL it should connect.',
+    savefail:'Reached the backend, but the last save didn\'t go through. Check the PLAN_KV binding and redeploy.'
+  };
+  const m=msgs[connWhy]||('Saving on this device only'+(connWhy?(' (server said '+connWhy+')'):'')+'.');
+  alert(m+'\n\nUntil it connects, your edits are safe on this device and will sync once the backend is reachable.');
+}
+function flashSaved(msg){
+  const p=document.getElementById('savingPill');
+  p.textContent=(msg||'Saved')+' ✓';
+  p.classList.add('show'); clearTimeout(p._t);
+  p._t=setTimeout(()=>p.classList.remove('show'),1100);
+}
+
+/* ---------- state ---------- */
+let state = { meals:[], plan:{} }; // meals:[{id,name,emoji}], plan:{ 'YYYY-MM-DD': mealId }
+let editingDate=null, chosenEmoji=null, emojiManual=false;
+
+const SEED_MEALS=[
+  'Spaghetti Bolognese','Chicken Curry','Tacos','Veggie Stir Fry',
+  'Salmon & Greens','Margherita Pizza','Caesar Salad','Beef Stew'
+];
+
+/* ---------- recipe locations ---------- */
+const SOURCES=[
+  {id:'TikTok', em:'🎵', dot:'#FE2C55'},
+  {id:'Facebook', em:'👍', dot:'#1877F2'},
+  {id:'Comfort in One', em:'🍲', dot:'#C9742E'},
+  {id:'Slow Cooker', em:'🥘', dot:'#7A5C3E'},
+  {id:'BBC Good Food', em:'📖', dot:'#2E8B57'},
+];
+function sourceMeta(id){ return SOURCES.find(s=>s.id===id)||null; }
+function srcTag(source){
+  const s=sourceMeta(source); if(!s) return '';
+  return `<span class="src-tag" style="--dot:${s.dot}">${s.em} ${escapeHtml(s.id)}</span>`;
+}
+
+/* ---------- who + last updated ---------- */
+let myName=null;
+try{ myName=localStorage.getItem('kp-name')||null; }catch(e){}
+function renderYou(){
+  const c=document.getElementById('youChip');
+  c.innerHTML=`<span class="dotme"></span>${myName?('You: '+escapeHtml(myName)):'Who are you? Tap to set'}`;
+}
+function setMyName(){
+  const n=prompt('Your name (so the other person sees who updated the plan):', myName||'');
+  if(n===null) return;
+  const t=n.trim(); myName=t||null;
+  try{ if(myName) localStorage.setItem('kp-name',myName); else localStorage.removeItem('kp-name'); }catch(e){}
+  renderYou();
+}
+function timeAgo(ts){
+  if(!ts) return '';
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return 'just now';
+  const m=Math.floor(s/60); if(m<60) return m+' min ago';
+  const h=Math.floor(m/60); if(h<24) return h+(h>1?' hrs':' hr')+' ago';
+  const d=Math.floor(h/24); if(d<7) return d+(d>1?' days':' day')+' ago';
+  return new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
+function renderMeta(){
+  const el=document.getElementById('metaUpd');
+  const meta=state.meta;
+  el.textContent=(meta&&meta.at)?('Updated '+(meta.by?('by '+meta.by+' '):'')+timeAgo(meta.at)):'';
+}
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function iso(d){ return d.toISOString().slice(0,10); }
+function parseISO(s){ const [y,m,dd]=s.split('-').map(Number); return new Date(y,m-1,dd); }
+
+/* build the list of dates: today → +4 months */
+function dateRange(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const end=new Date(today); end.setMonth(end.getMonth()+4);
+  const out=[]; const cur=new Date(today);
+  while(cur<=end){ out.push(new Date(cur)); cur.setDate(cur.getDate()+1); }
+  return out;
+}
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function findMeal(id){ return state.meals.find(m=>m.id===id)||null; }
+function mealByName(name){
+  const n=name.trim().toLowerCase();
+  return state.meals.find(m=>m.name.trim().toLowerCase()===n)||null;
+}
+function ensureMeal(name, emoji){
+  name=name.trim(); if(!name) return null;
+  let m=mealByName(name);
+  if(m){ if(emoji) m.emoji=emoji; return m; }
+  m={id:uid(),name,emoji:emoji||mealEmoji(name)};
+  state.meals.push(m); return m;
+}
+
+/* ---------- render schedule ---------- */
+function render(){
+  renderSchedule();
+  renderLibrary();
+  renderProgress();
+  renderMeta();
+}
+function renderProgress(){
+  const dates=dateRange();
+  const planned=dates.filter(d=>state.plan[iso(d)]).length;
+  const pct = dates.length? Math.round(planned/dates.length*100):0;
+  document.getElementById('barFill').style.width=pct+'%';
+  document.getElementById('progressTxt').textContent=`${planned} of ${dates.length} days planned`;
+}
+function renderSchedule(){
+  const wrap=document.getElementById('schedWrap');
+  wrap.innerHTML='';
+  const dates=dateRange();
+  const todayIso=iso(new Date(new Date().setHours(0,0,0,0)));
+  let curMonth=-1, idx=0;
+  dates.forEach((d)=>{
+    if(d.getMonth()!==curMonth){
+      curMonth=d.getMonth();
+      const m=document.createElement('div'); m.className='month';
+      m.innerHTML=`<h2>${MON[curMonth]}</h2><span>${d.getFullYear()}</span><div class="rule"></div>`;
+      wrap.appendChild(m);
+    }
+    const k=iso(d);
+    const meal=findMeal(state.plan[k]);
+    const isToday=k===todayIso;
+    const el=document.createElement('div');
+    el.className='day'+(meal?'':' empty')+(isToday?' today':'');
+    el.style.animationDelay=Math.min(idx*12,300)+'ms'; idx++;
+    el.tabIndex=0; el.setAttribute('role','button');
+    el.innerHTML=`
+      <div class="datecol"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>
+      <div class="plate">${meal?meal.emoji:'🍳'}</div>
+      <div class="body">
+        <div class="meal-name">${meal?escapeHtml(meal.name):'Tap to plan a meal'}${isToday?'<span class="today-flag">Today</span>':''}</div>
+        ${meal?srcTag(meal.source):''}
+      </div>
+      <div class="nudge">
+        <button class="up" aria-label="Move meal to previous day" ${meal?'':'disabled'}>${ICON.up}</button>
+        <button class="dn" aria-label="Move meal to next day" ${meal?'':'disabled'}>${ICON.down}</button>
+      </div>`;
+    el.addEventListener('click',(e)=>{ if(e.target.closest('.nudge')) return; openEditor(k); });
+    el.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();openEditor(k);} });
+    el.querySelector('.up').addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,-1);});
+    el.querySelector('.dn').addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,1);});
+    wrap.appendChild(el);
+  });
+}
+function shiftKey(k, dir){
+  // keys are generated with toISOString() (UTC); shift in the same UTC frame
+  const d=new Date(k+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+dir);
+  return d.toISOString().slice(0,10);
+}
+function swapDay(k, dir){
+  const k2=shiftKey(k,dir);
+  const a=state.plan[k], b=state.plan[k2];
+  if(b===undefined||b===null) delete state.plan[k]; else state.plan[k]=b;
+  if(a===undefined||a===null) delete state.plan[k2]; else state.plan[k2]=a;
+  saveData(state); render();
+}
+
+/* ---------- favourites leaderboard ---------- */
+function renderLibrary(){
+  const list=document.getElementById('libList');
+  list.innerHTML='';
+  if(state.meals.length===0){
+    list.innerHTML='<div class="empty-state"><div class="big">🏆</div>No favourites yet. Add the dishes you love above — the ones you plan most rise to the top.</div>';
+    return;
+  }
+  const counts={};
+  Object.values(state.plan).forEach(id=>{counts[id]=(counts[id]||0)+1;});
+  const ranked=[...state.meals].sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0)||a.name.localeCompare(b.name));
+  const totalPlanned=Object.values(state.plan).length;
+
+  const head=document.createElement('div'); head.className='lead-head';
+  head.innerHTML=`<h2>Most cooked</h2><span class="sm">${totalPlanned} day${totalPlanned===1?'':'s'} planned</span>`;
+  list.appendChild(head);
+
+  const medals=['🥇','🥈','🥉'];
+  ranked.forEach((m,i)=>{
+    const used=counts[m.id]||0;
+    const top=i<3 && used>0;
+    const row=document.createElement('div'); row.className='libitem'+(top?' top':'');
+    const rankCell = top ? `<span class="medal">${medals[i]}</span>` : (i+1);
+    row.innerHTML=`
+      <div class="rank">${rankCell}</div>
+      <div class="plate">${m.emoji}</div>
+      <div class="body">
+        <div class="ln">${escapeHtml(m.name)}</div>
+        ${srcTag(m.source)}
+      </div>
+      <div class="count-badge">${used}×</div>
+      <button class="iconbtn ed" aria-label="Rename ${escapeHtml(m.name)}">${ICON.edit}</button>
+      <button class="iconbtn del" aria-label="Delete ${escapeHtml(m.name)}">${ICON.trash}</button>`;
+    row.querySelector('.ed').addEventListener('click',()=>renameMeal(m));
+    row.querySelector('.del').addEventListener('click',()=>deleteMeal(m));
+    list.appendChild(row);
+  });
+}
+function renameMeal(m){
+  const nn=prompt('Rename meal:', m.name);
+  if(nn===null) return;
+  const t=nn.trim(); if(!t) return;
+  m.name=t; if(!m._emojiLocked) m.emoji=mealEmoji(t);
+  saveData(state); render();
+}
+function deleteMeal(m){
+  if(!confirm(`Remove "${m.name}" from your list? Days using it will be cleared.`)) return;
+  state.meals=state.meals.filter(x=>x.id!==m.id);
+  Object.keys(state.plan).forEach(k=>{ if(state.plan[k]===m.id) delete state.plan[k]; });
+  saveData(state); render();
+}
+
+/* ---------- editor sheet ---------- */
+function openEditor(k){
+  editingDate=k; emojiManual=false;
+  const d=parseISO(k);
+  const meal=findMeal(state.plan[k]);
+  document.getElementById('sheetKicker').textContent = meal?'Edit this day':'Plan this day';
+  document.getElementById('sheetDate').textContent =
+    `${DOW[d.getDay()]}, ${MON[d.getMonth()]} ${d.getDate()}`;
+  const input=document.getElementById('mealInput');
+  input.value = meal?meal.name:'';
+  chosenEmoji = meal?meal.emoji:mealEmoji('');
+  if(meal) emojiManual=true;
+  updatePreview();
+  buildEmojiPicker();
+  buildRepeatChips();
+  document.getElementById('srcSelect').value = meal?(meal.source||''):'';
+  document.getElementById('clearBtn').style.display = meal?'block':'none';
+  openSheet();
+  setTimeout(()=>{ if(!meal) input.focus(); },280);
+}
+function updatePreview(){
+  document.getElementById('previewPlate').textContent = chosenEmoji||'🍽️';
+}
+function buildEmojiPicker(){
+  const wrap=document.getElementById('emojiPick'); wrap.innerHTML='';
+  const set=[...new Set([chosenEmoji,...EMOJI_PALETTE])];
+  set.forEach(em=>{
+    const b=document.createElement('button');
+    b.textContent=em; b.setAttribute('aria-pressed', em===chosenEmoji);
+    b.addEventListener('click',()=>{ chosenEmoji=em; emojiManual=true; updatePreview();
+      wrap.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed', x.textContent===em)); });
+    wrap.appendChild(b);
+  });
+}
+function buildRepeatChips(){
+  const wrap=document.getElementById('repeatChips');
+  const lbl=document.getElementById('repeatLbl');
+  wrap.innerHTML='';
+  if(state.meals.length===0){ lbl.style.display='none'; return; }
+  lbl.style.display='block';
+  const counts={}; Object.values(state.plan).forEach(id=>counts[id]=(counts[id]||0)+1);
+  [...state.meals].sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0)).slice(0,12).forEach(m=>{
+    const c=document.createElement('button'); c.className='chip';
+    c.innerHTML=`<span class="em">${m.emoji}</span>${escapeHtml(m.name)}`;
+    c.addEventListener('click',()=>{
+      document.getElementById('mealInput').value=m.name;
+      document.getElementById('srcSelect').value=m.source||'';
+      chosenEmoji=m.emoji; emojiManual=true; updatePreview(); buildEmojiPicker();
+    });
+    wrap.appendChild(c);
+  });
+}
+function openSheet(){
+  document.getElementById('scrim').classList.add('open');
+  document.getElementById('sheet').classList.add('open');
+}
+function closeSheet(){
+  document.getElementById('scrim').classList.remove('open');
+  document.getElementById('sheet').classList.remove('open');
+  editingDate=null;
+}
+function saveEditor(){
+  const name=document.getElementById('mealInput').value.trim();
+  if(!name){ clearDay(); return; }
+  const m=ensureMeal(name, chosenEmoji);
+  if(emojiManual){ m.emoji=chosenEmoji; m._emojiLocked=true; }
+  m.source=document.getElementById('srcSelect').value||'';
+  state.plan[editingDate]=m.id;
+  saveData(state); render(); closeSheet();
+}
+function clearDay(){
+  if(editingDate){ delete state.plan[editingDate]; saveData(state); render(); }
+  closeSheet();
+}
+
+/* live emoji suggestion as she types (unless she picked one) */
+function onMealInput(){
+  if(emojiManual) return;
+  chosenEmoji=mealEmoji(document.getElementById('mealInput').value);
+  updatePreview(); buildEmojiPicker();
+}
+
+/* ---------- library add ---------- */
+function addLibMeal(){
+  const inp=document.getElementById('libInput');
+  const v=inp.value.trim(); if(!v) return;
+  ensureMeal(v); inp.value=''; saveData(state); render();
+}
+
+/* ---------- tabs ---------- */
+function setTab(which){
+  const sched=which==='sched';
+  document.getElementById('tabSched').setAttribute('aria-selected',sched);
+  document.getElementById('tabLib').setAttribute('aria-selected',!sched);
+  document.getElementById('schedWrap').classList.toggle('hide',!sched);
+  document.getElementById('libWrap').classList.toggle('show',!sched);
+}
+
+/* ---------- util ---------- */
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function buildSourceSelect(){
+  const sel=document.getElementById('srcSelect');
+  sel.innerHTML='<option value="">— none —</option>'+
+    SOURCES.map(s=>`<option value="${s.id}">${s.em} ${s.id}</option>`).join('');
+}
+
+/* ---------- wire up ---------- */
+document.getElementById('tabSched').addEventListener('click',()=>setTab('sched'));
+document.getElementById('tabLib').addEventListener('click',()=>setTab('lib'));
+document.getElementById('saveBtn').addEventListener('click',saveEditor);
+document.getElementById('cancelBtn').addEventListener('click',closeSheet);
+document.getElementById('clearBtn').addEventListener('click',clearDay);
+document.getElementById('scrim').addEventListener('click',closeSheet);
+document.getElementById('mealInput').addEventListener('input',onMealInput);
+document.getElementById('mealInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditor();});
+document.getElementById('libAddBtn').addEventListener('click',addLibMeal);
+document.getElementById('libInput').addEventListener('keydown',e=>{if(e.key==='Enter')addLibMeal();});
+document.getElementById('youChip').addEventListener('click',setMyName);
+document.getElementById('connChip').addEventListener('click',connHelp);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
+
+/* ---------- boot ---------- */
+(async function init(){
+  buildSourceSelect();
+  renderYou();
+  const saved=await loadData();
+  if(saved && saved.meals){ state=saved; }
+  else { state={ meals: SEED_MEALS.map(n=>({id:uid(),name:n,emoji:mealEmoji(n),source:''})), plan:{} }; saveData(state); }
+  render();
+})();
+</script>
+</body>
+</html>
