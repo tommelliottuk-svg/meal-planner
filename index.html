@@ -64,11 +64,13 @@
   .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--sage),var(--jam));border-radius:999px;transition:width .4s ease}
 
   /* tabs */
-  .tabs{max-width:680px;margin:6px auto 0;padding:0 20px;display:flex;gap:8px}
+  .tabs{max-width:680px;margin:6px auto 0;padding:0 20px;display:flex;gap:8px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
   .tab{
     appearance:none;border:1px solid var(--line);background:var(--card);
     font:inherit;font-weight:700;font-size:14px;color:var(--ink-soft);
-    padding:9px 16px;border-radius:999px;cursor:pointer;transition:.15s;
+    padding:9px 16px;border-radius:999px;cursor:pointer;transition:.15s;flex:none;white-space:nowrap;
   }
   .tab[aria-selected="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
   .tab:focus-visible{outline:3px solid var(--jam-tint);outline-offset:2px}
@@ -271,6 +273,33 @@
   .count-badge{display:inline-flex;align-items:center;font-weight:800;font-size:13px;color:var(--jam);
     background:var(--jam-tint);padding:4px 9px;border-radius:999px;flex:none}
 
+  /* secondary lines on day cards */
+  .sub-line{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub-line.note{color:var(--jam)}
+
+  /* eating-out / event days */
+  .day.event{background:var(--sage-tint);border-color:#cfe0c4}
+  .plate.ev{background:radial-gradient(circle at 50% 38%, #fff, var(--jam-tint));font-size:24px}
+
+  /* eating-out toggle + note in editor */
+  .out-row{margin:2px 0 8px}
+  .out-toggle{appearance:none;width:100%;border:1px dashed var(--line);background:var(--card);font:inherit;
+    font-weight:700;font-size:14px;color:var(--ink-soft);padding:12px;border-radius:14px;cursor:pointer;transition:.12s}
+  .out-toggle.on{border-style:solid;border-color:var(--jam);background:var(--jam-tint);color:var(--jam-deep)}
+
+  /* shopping list */
+  .shopwrap{display:none}
+  .shopwrap.show{display:block}
+  .shop-item{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:11px 13px;margin-bottom:9px;box-shadow:var(--shadow)}
+  .shop-item .check{appearance:none;width:28px;height:28px;flex:none;border:2px solid var(--line);border-radius:8px;
+    background:var(--paper);cursor:pointer;display:grid;place-items:center;font-weight:800;color:#fff;font-size:15px;transition:.12s}
+  .shop-item.done .check{background:var(--sage);border-color:var(--sage)}
+  .shop-item .stext{flex:1;font-size:16px;font-weight:600;min-width:0;word-break:break-word}
+  .shop-item.done .stext{text-decoration:line-through;color:var(--ink-soft)}
+  #shopFoot{margin-top:10px}
+
   @media (max-width:420px){
     h1{font-size:29px}
     .meal-name{font-size:16px}
@@ -295,8 +324,10 @@
   </header>
 
   <div class="tabs" role="tablist">
-    <button class="tab" id="tabSched" role="tab" aria-selected="true">📅 Schedule</button>
+    <button class="tab" id="tabDin" role="tab" aria-selected="true">🍽️ Dinners</button>
+    <button class="tab" id="tabLun" role="tab" aria-selected="false">🥪 Lunches</button>
     <button class="tab" id="tabLib" role="tab" aria-selected="false">🏆 Favourites</button>
+    <button class="tab" id="tabShop" role="tab" aria-selected="false">🛒 Shopping</button>
   </div>
 
   <div class="meta-line">
@@ -315,6 +346,15 @@
       </div>
       <div id="libList"></div>
     </section>
+
+    <section class="shopwrap" id="shopWrap">
+      <div class="lib-add">
+        <input id="shopInput" type="text" placeholder="Add to shopping list…" autocomplete="off" />
+        <button class="btn" id="shopAddBtn">Add</button>
+      </div>
+      <div id="shopList"></div>
+      <div id="shopFoot"></div>
+    </section>
   </main>
 
   <footer>
@@ -328,19 +368,35 @@
     <h3 id="sheetKicker">Plan this day</h3>
     <p class="dlabel" id="sheetDate">—</p>
 
-    <div class="field-row">
-      <div class="plate preview-plate" id="previewPlate">🍽️</div>
-      <input class="name" id="mealInput" type="text" placeholder="What's for dinner?" autocomplete="off" />
+    <div class="out-row" id="outRow">
+      <button type="button" class="out-toggle" id="outToggle">🍽️ Eating in (tap if you're out)</button>
     </div>
 
-    <div class="lbl">Pick an icon</div>
-    <div class="emoji-pick" id="emojiPick"></div>
+    <div id="outFields" style="display:none">
+      <div class="lbl">Where are you / what's on?</div>
+      <input class="name" id="eventInput" type="text" placeholder="e.g. World Cup game, Menorca…" autocomplete="off" />
+    </div>
 
-    <div class="lbl">Recipe location</div>
-    <div class="src-select"><select id="srcSelect"></select></div>
+    <div id="mealFields">
+      <div class="field-row">
+        <div class="plate preview-plate" id="previewPlate">🍽️</div>
+        <input class="name" id="mealInput" type="text" placeholder="What's for dinner?" autocomplete="off" />
+      </div>
 
-    <div class="lbl" id="repeatLbl">From your meals</div>
-    <div class="chips" id="repeatChips"></div>
+      <div class="lbl">Pick an icon</div>
+      <div class="emoji-pick" id="emojiPick"></div>
+
+      <div class="lbl">Recipe location</div>
+      <div class="src-select"><select id="srcSelect"></select></div>
+
+      <div class="lbl" id="repeatLbl">From your meals</div>
+      <div class="chips" id="repeatChips"></div>
+    </div>
+
+    <div id="noteWrap">
+      <div class="lbl">Note (optional)</div>
+      <input class="name" id="noteInput" type="text" placeholder="e.g. no roast this week, alt: ham pasta…" autocomplete="off" />
+    </div>
 
     <div class="sheet-actions">
       <button class="btn danger" id="clearBtn">Clear day</button>
@@ -516,8 +572,10 @@ function flashSaved(msg){
 }
 
 /* ---------- state ---------- */
-let state = { meals:[], plan:{} }; // meals:[{id,name,emoji}], plan:{ 'YYYY-MM-DD': mealId }
-let editingDate=null, chosenEmoji=null, emojiManual=false;
+let state = { meals:[], plan:{}, lunch:{}, events:{}, notes:{}, shopping:[] };
+let viewType='dinner';            // schedule cards show 'dinner' or 'lunch'
+let editingDate=null, editingType='dinner', chosenEmoji=null, emojiManual=false, outMode=false;
+function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.notes=s.notes||{}; s.shopping=s.shopping||[]; return s; }
 
 const SEED_MEALS=[
   'Spaghetti Bolognese','Chicken Curry','Tacos','Veggie Stir Fry',
@@ -568,7 +626,7 @@ function renderMeta(){
 }
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
-function iso(d){ return d.toISOString().slice(0,10); }
+function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function parseISO(s){ const [y,m,dd]=s.split('-').map(Number); return new Date(y,m-1,dd); }
 
 /* build the list of dates: today → +4 months */
@@ -587,76 +645,107 @@ function mealByName(name){
   const n=name.trim().toLowerCase();
   return state.meals.find(m=>m.name.trim().toLowerCase()===n)||null;
 }
-function ensureMeal(name, emoji){
+function ensureMeal(name, emoji, source){
   name=name.trim(); if(!name) return null;
   let m=mealByName(name);
-  if(m){ if(emoji) m.emoji=emoji; return m; }
-  m={id:uid(),name,emoji:emoji||mealEmoji(name)};
+  if(m){ if(emoji) m.emoji=emoji; if(source) m.source=source; return m; }
+  m={id:uid(),name,emoji:emoji||mealEmoji(name),source:source||''};
   state.meals.push(m); return m;
 }
+function mealCounts(){
+  const c={};
+  Object.values(state.plan).forEach(id=>{ if(id) c[id]=(c[id]||0)+1; });
+  Object.values(state.lunch).forEach(id=>{ if(id) c[id]=(c[id]||0)+1; });
+  return c;
+}
 
-/* ---------- render schedule ---------- */
+/* ---------- render ---------- */
 function render(){
   renderSchedule();
   renderLibrary();
+  renderShopping();
   renderProgress();
   renderMeta();
 }
 function renderProgress(){
   const dates=dateRange();
-  const planned=dates.filter(d=>state.plan[iso(d)]).length;
+  const planned=dates.filter(d=>{ const k=iso(d); return state.plan[k]||state.events[k]; }).length;
   const pct = dates.length? Math.round(planned/dates.length*100):0;
   document.getElementById('barFill').style.width=pct+'%';
-  document.getElementById('progressTxt').textContent=`${planned} of ${dates.length} days planned`;
+  document.getElementById('progressTxt').textContent=`${planned} of ${dates.length} dinners sorted`;
 }
 function renderSchedule(){
   const wrap=document.getElementById('schedWrap');
   wrap.innerHTML='';
+  const isDinner=(viewType==='dinner');
+  const map = isDinner?state.plan:state.lunch;
+  const other = isDinner?state.lunch:state.plan;
   const dates=dateRange();
   const todayIso=iso(new Date(new Date().setHours(0,0,0,0)));
   let curMonth=-1, idx=0;
   dates.forEach((d)=>{
     if(d.getMonth()!==curMonth){
       curMonth=d.getMonth();
-      const m=document.createElement('div'); m.className='month';
-      m.innerHTML=`<h2>${MON[curMonth]}</h2><span>${d.getFullYear()}</span><div class="rule"></div>`;
-      wrap.appendChild(m);
+      const mh=document.createElement('div'); mh.className='month';
+      mh.innerHTML=`<h2>${MON[curMonth]}</h2><span>${d.getFullYear()}</span><div class="rule"></div>`;
+      wrap.appendChild(mh);
     }
     const k=iso(d);
-    const meal=findMeal(state.plan[k]);
     const isToday=k===todayIso;
+    const ev = isDinner ? state.events[k] : null;
+    const meal = ev ? null : findMeal(map[k]);
+    const otherMeal = findMeal(other[k]);
+    const note = isDinner ? state.notes[k] : null;
+    const flag = isToday?'<span class="today-flag">Today</span>':'';
     const el=document.createElement('div');
-    el.className='day'+(meal?'':' empty')+(isToday?' today':'');
-    el.style.animationDelay=Math.min(idx*12,300)+'ms'; idx++;
     el.tabIndex=0; el.setAttribute('role','button');
-    el.innerHTML=`
-      <div class="datecol"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>
-      <div class="plate">${meal?meal.emoji:'🍳'}</div>
-      <div class="body">
-        <div class="meal-name">${meal?escapeHtml(meal.name):'Tap to plan a meal'}${isToday?'<span class="today-flag">Today</span>':''}</div>
-        ${meal?srcTag(meal.source):''}
-      </div>
-      <div class="nudge">
-        <button class="up" aria-label="Move meal to previous day" ${meal?'':'disabled'}>${ICON.up}</button>
-        <button class="dn" aria-label="Move meal to next day" ${meal?'':'disabled'}>${ICON.down}</button>
-      </div>`;
+    el.style.animationDelay=Math.min(idx*10,260)+'ms'; idx++;
+    if(ev){
+      el.className='day event'+(isToday?' today':'');
+      el.innerHTML=`
+        <div class="datecol"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>
+        <div class="plate ev">🎈</div>
+        <div class="body">
+          <div class="meal-name">${escapeHtml(ev)}${flag}</div>
+          <span class="src-tag" style="--dot:#B23A66">🚫 Out — not cooking</span>
+          ${otherMeal?`<div class="sub-line">🥪 Lunch: ${escapeHtml(otherMeal.name)}</div>`:''}
+        </div>`;
+    } else {
+      const emptyEmoji = isDinner?'🍳':'🥪';
+      const placeholder = isDinner?'Tap to plan dinner':'Tap to add lunch';
+      el.className='day'+(meal?'':' empty')+(isToday?' today':'');
+      el.innerHTML=`
+        <div class="datecol"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>
+        <div class="plate">${meal?meal.emoji:emptyEmoji}</div>
+        <div class="body">
+          <div class="meal-name">${meal?escapeHtml(meal.name):placeholder}${flag}</div>
+          ${meal?srcTag(meal.source):''}
+          ${note?`<div class="sub-line note">📝 ${escapeHtml(note)}</div>`:''}
+          ${otherMeal?`<div class="sub-line">${isDinner?'🥪 Lunch':'🍽️ Dinner'}: ${escapeHtml(otherMeal.name)}</div>`:''}
+        </div>
+        <div class="nudge">
+          <button class="up" aria-label="Move to previous day" ${meal?'':'disabled'}>${ICON.up}</button>
+          <button class="dn" aria-label="Move to next day" ${meal?'':'disabled'}>${ICON.down}</button>
+        </div>`;
+    }
     el.addEventListener('click',(e)=>{ if(e.target.closest('.nudge')) return; openEditor(k); });
     el.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();openEditor(k);} });
-    el.querySelector('.up').addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,-1);});
-    el.querySelector('.dn').addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,1);});
+    const up=el.querySelector('.up'), dn=el.querySelector('.dn');
+    if(up) up.addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,-1);});
+    if(dn) dn.addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,1);});
     wrap.appendChild(el);
   });
 }
 function shiftKey(k, dir){
-  // keys are generated with toISOString() (UTC); shift in the same UTC frame
-  const d=new Date(k+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+dir);
-  return d.toISOString().slice(0,10);
+  const d=parseISO(k); d.setDate(d.getDate()+dir);
+  return iso(d);
 }
 function swapDay(k, dir){
+  const map = (viewType==='lunch')?state.lunch:state.plan;
   const k2=shiftKey(k,dir);
-  const a=state.plan[k], b=state.plan[k2];
-  if(b===undefined||b===null) delete state.plan[k]; else state.plan[k]=b;
-  if(a===undefined||a===null) delete state.plan[k2]; else state.plan[k2]=a;
+  const a=map[k], b=map[k2];
+  if(b===undefined||b===null) delete map[k]; else map[k]=b;
+  if(a===undefined||a===null) delete map[k2]; else map[k2]=a;
   saveData(state); render();
 }
 
@@ -668,10 +757,9 @@ function renderLibrary(){
     list.innerHTML='<div class="empty-state"><div class="big">🏆</div>No favourites yet. Add the dishes you love above — the ones you plan most rise to the top.</div>';
     return;
   }
-  const counts={};
-  Object.values(state.plan).forEach(id=>{counts[id]=(counts[id]||0)+1;});
+  const counts=mealCounts();
   const ranked=[...state.meals].sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0)||a.name.localeCompare(b.name));
-  const totalPlanned=Object.values(state.plan).length;
+  const totalPlanned=Object.values(state.plan).length+Object.values(state.lunch).length;
 
   const head=document.createElement('div'); head.className='lead-head';
   head.innerHTML=`<h2>Most cooked</h2><span class="sm">${totalPlanned} day${totalPlanned===1?'':'s'} planned</span>`;
@@ -709,28 +797,47 @@ function deleteMeal(m){
   if(!confirm(`Remove "${m.name}" from your list? Days using it will be cleared.`)) return;
   state.meals=state.meals.filter(x=>x.id!==m.id);
   Object.keys(state.plan).forEach(k=>{ if(state.plan[k]===m.id) delete state.plan[k]; });
+  Object.keys(state.lunch).forEach(k=>{ if(state.lunch[k]===m.id) delete state.lunch[k]; });
   saveData(state); render();
 }
 
 /* ---------- editor sheet ---------- */
+function setOut(on){
+  outMode=on;
+  document.getElementById('outFields').style.display=on?'block':'none';
+  document.getElementById('mealFields').style.display=on?'none':'block';
+  const t=document.getElementById('outToggle');
+  t.textContent = on?'🚫 Out / not cooking — tap to switch back':'🍽️ Eating in (tap if you\'re out)';
+  t.classList.toggle('on',on);
+  if(on) setTimeout(()=>document.getElementById('eventInput').focus(),60);
+}
 function openEditor(k){
-  editingDate=k; emojiManual=false;
+  editingDate=k; editingType=viewType; emojiManual=false;
   const d=parseISO(k);
-  const meal=findMeal(state.plan[k]);
-  document.getElementById('sheetKicker').textContent = meal?'Edit this day':'Plan this day';
-  document.getElementById('sheetDate').textContent =
-    `${DOW[d.getDay()]}, ${MON[d.getMonth()]} ${d.getDate()}`;
+  const isDinner=(viewType==='dinner');
+  document.getElementById('sheetDate').textContent=`${DOW[d.getDay()]}, ${MON[d.getMonth()]} ${d.getDate()}`;
+  document.getElementById('outRow').style.display = isDinner?'block':'none';
+  document.getElementById('noteWrap').style.display = isDinner?'block':'none';
+  const map = isDinner?state.plan:state.lunch;
+  const meal=findMeal(map[k]);
+  const ev = isDinner ? (state.events[k]||'') : '';
+  document.getElementById('sheetKicker').textContent =
+    isDinner ? ((meal||ev)?'Edit dinner':'Plan dinner') : (meal?'Edit lunch':'Plan lunch');
   const input=document.getElementById('mealInput');
+  input.placeholder = isDinner?"What's for dinner?":"What's for lunch?";
   input.value = meal?meal.name:'';
   chosenEmoji = meal?meal.emoji:mealEmoji('');
-  if(meal) emojiManual=true;
-  updatePreview();
-  buildEmojiPicker();
-  buildRepeatChips();
+  emojiManual = !!meal;
+  updatePreview(); buildEmojiPicker(); buildRepeatChips();
   document.getElementById('srcSelect').value = meal?(meal.source||''):'';
-  document.getElementById('clearBtn').style.display = meal?'block':'none';
+  if(isDinner){
+    document.getElementById('eventInput').value = ev;
+    document.getElementById('noteInput').value = state.notes[k]||'';
+    setOut(!!ev);
+  } else { setOut(false); }
+  document.getElementById('clearBtn').style.display = (meal||ev)?'block':'none';
   openSheet();
-  setTimeout(()=>{ if(!meal) input.focus(); },280);
+  setTimeout(()=>{ if(!meal && !ev) input.focus(); },280);
 }
 function updatePreview(){
   document.getElementById('previewPlate').textContent = chosenEmoji||'🍽️';
@@ -752,7 +859,7 @@ function buildRepeatChips(){
   wrap.innerHTML='';
   if(state.meals.length===0){ lbl.style.display='none'; return; }
   lbl.style.display='block';
-  const counts={}; Object.values(state.plan).forEach(id=>counts[id]=(counts[id]||0)+1);
+  const counts=mealCounts();
   [...state.meals].sort((a,b)=>(counts[b.id]||0)-(counts[a.id]||0)).slice(0,12).forEach(m=>{
     const c=document.createElement('button'); c.className='chip';
     c.innerHTML=`<span class="em">${m.emoji}</span>${escapeHtml(m.name)}`;
@@ -774,16 +881,34 @@ function closeSheet(){
   editingDate=null;
 }
 function saveEditor(){
-  const name=document.getElementById('mealInput').value.trim();
-  if(!name){ clearDay(); return; }
-  const m=ensureMeal(name, chosenEmoji);
-  if(emojiManual){ m.emoji=chosenEmoji; m._emojiLocked=true; }
-  m.source=document.getElementById('srcSelect').value||'';
-  state.plan[editingDate]=m.id;
+  const k=editingDate; if(!k){ closeSheet(); return; }
+  const isDinner=(editingType==='dinner');
+  if(isDinner){
+    const note=document.getElementById('noteInput').value.trim();
+    if(outMode){
+      const ev=document.getElementById('eventInput').value.trim();
+      if(ev){ state.events[k]=ev; delete state.plan[k]; } else { delete state.events[k]; }
+    } else {
+      delete state.events[k];
+      const name=document.getElementById('mealInput').value.trim();
+      if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; state.plan[k]=m.id; }
+      else { delete state.plan[k]; }
+    }
+    if(note) state.notes[k]=note; else delete state.notes[k];
+  } else {
+    const name=document.getElementById('mealInput').value.trim();
+    if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; state.lunch[k]=m.id; }
+    else { delete state.lunch[k]; }
+  }
   saveData(state); render(); closeSheet();
 }
 function clearDay(){
-  if(editingDate){ delete state.plan[editingDate]; saveData(state); render(); }
+  const k=editingDate;
+  if(k){
+    if(editingType==='dinner'){ delete state.plan[k]; delete state.events[k]; delete state.notes[k]; }
+    else { delete state.lunch[k]; }
+    saveData(state); render();
+  }
   closeSheet();
 }
 
@@ -803,11 +928,49 @@ function addLibMeal(){
 
 /* ---------- tabs ---------- */
 function setTab(which){
-  const sched=which==='sched';
-  document.getElementById('tabSched').setAttribute('aria-selected',sched);
-  document.getElementById('tabLib').setAttribute('aria-selected',!sched);
-  document.getElementById('schedWrap').classList.toggle('hide',!sched);
-  document.getElementById('libWrap').classList.toggle('show',!sched);
+  if(which==='dinner'||which==='lunch') viewType=which;
+  document.getElementById('tabDin').setAttribute('aria-selected', which==='dinner');
+  document.getElementById('tabLun').setAttribute('aria-selected', which==='lunch');
+  document.getElementById('tabLib').setAttribute('aria-selected', which==='lib');
+  document.getElementById('tabShop').setAttribute('aria-selected', which==='shop');
+  const showSched=(which==='dinner'||which==='lunch');
+  document.getElementById('schedWrap').classList.toggle('hide', !showSched);
+  document.getElementById('libWrap').classList.toggle('show', which==='lib');
+  document.getElementById('shopWrap').classList.toggle('show', which==='shop');
+  if(showSched) renderSchedule();
+  if(which==='lib') renderLibrary();
+  if(which==='shop') renderShopping();
+}
+
+/* ---------- shopping list ---------- */
+function renderShopping(){
+  const list=document.getElementById('shopList');
+  const foot=document.getElementById('shopFoot');
+  if(!list) return;
+  list.innerHTML='';
+  const items=state.shopping||[];
+  if(items.length===0){
+    list.innerHTML='<div class="empty-state"><div class="big">🛒</div>Your shopping list is empty. Add what you need above — it syncs to both of you.</div>';
+    foot.innerHTML=''; return;
+  }
+  items.forEach(it=>{
+    const row=document.createElement('div'); row.className='shop-item'+(it.done?' done':'');
+    row.innerHTML=`
+      <button class="check" aria-label="Tick off">${it.done?'✓':''}</button>
+      <span class="stext">${escapeHtml(it.text)}</span>
+      <button class="iconbtn del" aria-label="Delete">${ICON.trash}</button>`;
+    row.querySelector('.check').addEventListener('click',()=>{ it.done=!it.done; saveData(state); renderShopping(); });
+    row.querySelector('.del').addEventListener('click',()=>{ state.shopping=state.shopping.filter(x=>x.id!==it.id); saveData(state); renderShopping(); });
+    list.appendChild(row);
+  });
+  const done=items.filter(i=>i.done).length;
+  foot.innerHTML = done?`<button class="btn ghost" id="clearChecked">Clear ${done} ticked item${done>1?'s':''}</button>`:'';
+  if(done){ document.getElementById('clearChecked').addEventListener('click',()=>{ state.shopping=state.shopping.filter(i=>!i.done); saveData(state); renderShopping(); }); }
+}
+function addShopItem(){
+  const inp=document.getElementById('shopInput'); const v=inp.value.trim(); if(!v) return;
+  if(!state.shopping) state.shopping=[];
+  state.shopping.push({id:uid(),text:v,done:false}); inp.value=''; saveData(state); renderShopping();
 }
 
 /* ---------- util ---------- */
@@ -818,17 +981,111 @@ function buildSourceSelect(){
     SOURCES.map(s=>`<option value="${s.id}">${s.em} ${s.id}</option>`).join('');
 }
 
+/* ---------- one-time starter plan import ---------- */
+const STARTER_BASE=[2026,6,16]; // first entry = Tue 16 Jun 2026
+const STARTER=[
+  {din:"Tuna steaks", note:"Alt: ham pasta"},
+  {din:"Nando's chicken & halloumi orzo", ds:"TikTok", note:"Alt: sausage pasta"},
+  {ev:"Nana's funeral", lun:"Mac and cheese"},
+  {din:"Chicken harissa spaghetti", ds:"Facebook", lun:"Shakshuka"},
+  {ev:"Tom's pals"},
+  {din:"Roast ham with cabbage cheese"},
+  {din:"Chopped salad", lun:"Cabbage soup", ls:"TikTok"},
+  {ev:"World Cup game"},
+  {din:"Nando's", lun:"Green goddess salad", ls:"TikTok"},
+  {din:"Chipotle shrimp salad with garlic bread"},
+  {din:"Beef, mushroom & green stir fry", ds:"BBC Good Food", lun:"Cheesy lentil soup"},
+  {din:"Chickpea gyros", ds:"TikTok"},
+  {din:"Roast chicken with red cabbage"},
+  {din:"Pad Thai", lun:"Salmon & avocado salad sandwiches"},
+  {din:"Garlic butter salmon", ds:"TikTok", note:"Alt: beef stew"},
+  {ev:"Menorca ✈️"},
+  {din:"Leftover jambalaya"},
+  {din:"Mixed herbs spice bag"},
+  {din:"Salmon pasta"},
+  {din:"Roast ham with red cabbage"},
+  {din:"Picky bits dinner", lun:"Ramen", ls:"TikTok"},
+  {din:"Beef chow mein"},
+  {din:"Slow cooker chicken korma", ds:"Slow Cooker", lun:"Tuna salad with pesto croutons", ls:"Comfort in One"},
+  {din:"Mackerel"},
+  {ev:"Bing cooks"},
+  {din:"Burgers"},
+  {ev:"Ballie Ballerson"},
+  {din:"Peri peri chicken traybake", ds:"BBC Good Food"},
+  {din:"Haddock"},
+  {din:"Steak salad", ds:"TikTok"},
+  {din:"Sloppy Joe pasta", ds:"Comfort in One"},
+  {din:"Mediterranean spice bag"},
+  {din:"Garlic butter & lemon chicken orzo", ds:"Comfort in One"},
+  {din:"Roast chicken with mac and cheese"},
+  {din:"Slow cooker Thai peanut chicken", ds:"Slow Cooker"},
+  {din:"Chimichurri chicken salad", ds:"Comfort in One"},
+  {din:"Salmon curry"},
+  {din:"Breaded chicken salad"},
+  {din:"Spicy steak ramen", ds:"Facebook"},
+  {din:"Lasagna"},
+  {din:"Roast pork with crackling & cabbage cheese"},
+  {din:"Ham & cheese pasta", ds:"Slow Cooker"},
+  {din:"Mackerel"},
+  {din:"Slow cooker daal", ds:"Slow Cooker"},
+  {ev:"Tom's summer party"},
+  {din:"Slow cooker beef brisket ragu", ds:"Slow Cooker"},
+  {din:"Burger bowl", ds:"TikTok"},
+  {din:"Roast lamb with mac and cheese"},
+  {din:"Lamb curry"},
+  {din:"Seafood risotto"},
+  {din:"Chicken Caesar wraps", ds:"TikTok"},
+  {din:"Marmite sausages", ds:"Slow Cooker"},
+  {din:"Hot dogs"},
+  {din:"Green orzo"},
+  {din:"Roast chicken with broccoli cheese"},
+  {din:"Spanish paprika chicken"},
+  {din:"Paella"},
+  {din:"Slow cooker chicken fajitas", ds:"Slow Cooker"},
+  {din:"Steak summer salad", ds:"BBC Good Food"},
+  {din:"Taco bowl", ds:"TikTok"},
+  {din:"Salmon"},
+  {din:"Steak", note:"No roast this week"},
+  {din:"Chickpea & halloumi salad"},
+  {din:"Fish fingers"},
+  {din:"Lemon chicken", ds:"TikTok"},
+  {din:"Prawn curry", ds:"TikTok"},
+  {din:"Fry up"},
+  {din:"Creamy sausage orzo"},
+  {din:"Steak & burrata sandwich", ds:"Facebook", note:"No roast this week"}
+];
+function importStarter(){
+  const base=new Date(STARTER_BASE[0], STARTER_BASE[1]-1, STARTER_BASE[2]);
+  STARTER.forEach((e,i)=>{
+    const d=new Date(base); d.setDate(base.getDate()+i);
+    const k=iso(d);
+    if(e.ev && !state.events[k]) state.events[k]=e.ev;
+    if(e.din && !state.events[k] && !state.plan[k]){ const m=ensureMeal(e.din, null, e.ds||''); state.plan[k]=m.id; }
+    if(e.lun && !state.lunch[k]){ const m=ensureMeal(e.lun, null, e.ls||''); state.lunch[k]=m.id; }
+    if(e.note && !state.notes[k]) state.notes[k]=e.note;
+  });
+  state.imported='v1';
+  saveData(state);
+}
+
 /* ---------- wire up ---------- */
-document.getElementById('tabSched').addEventListener('click',()=>setTab('sched'));
+document.getElementById('tabDin').addEventListener('click',()=>setTab('dinner'));
+document.getElementById('tabLun').addEventListener('click',()=>setTab('lunch'));
 document.getElementById('tabLib').addEventListener('click',()=>setTab('lib'));
+document.getElementById('tabShop').addEventListener('click',()=>setTab('shop'));
 document.getElementById('saveBtn').addEventListener('click',saveEditor);
 document.getElementById('cancelBtn').addEventListener('click',closeSheet);
 document.getElementById('clearBtn').addEventListener('click',clearDay);
 document.getElementById('scrim').addEventListener('click',closeSheet);
+document.getElementById('outToggle').addEventListener('click',()=>setOut(!outMode));
 document.getElementById('mealInput').addEventListener('input',onMealInput);
 document.getElementById('mealInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditor();});
+document.getElementById('eventInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditor();});
+document.getElementById('noteInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditor();});
 document.getElementById('libAddBtn').addEventListener('click',addLibMeal);
 document.getElementById('libInput').addEventListener('keydown',e=>{if(e.key==='Enter')addLibMeal();});
+document.getElementById('shopAddBtn').addEventListener('click',addShopItem);
+document.getElementById('shopInput').addEventListener('keydown',e=>{if(e.key==='Enter')addShopItem();});
 document.getElementById('youChip').addEventListener('click',setMyName);
 document.getElementById('connChip').addEventListener('click',connHelp);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
@@ -838,8 +1095,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
   buildSourceSelect();
   renderYou();
   const saved=await loadData();
-  if(saved && saved.meals){ state=saved; }
-  else { state={ meals: SEED_MEALS.map(n=>({id:uid(),name:n,emoji:mealEmoji(n),source:''})), plan:{} }; saveData(state); }
+  if(saved && saved.meals){ state=ensureModel(saved); }
+  else { state=ensureModel({ meals: SEED_MEALS.map(n=>({id:uid(),name:n,emoji:mealEmoji(n),source:''})), plan:{} }); saveData(state); }
+  if(state.imported!=='v1'){ importStarter(); }
   render();
 })();
 </script>
