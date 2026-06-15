@@ -94,8 +94,8 @@
     background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow);
     cursor:pointer;transition:transform .12s ease, box-shadow .12s ease, border-color .12s;
-    animation:rise .4s ease both;
   }
+  .schedwrap.intro .day{animation:rise .4s ease both}
   .day:hover{transform:translateY(-1px)}
   .day:focus-within{border-color:var(--jam)}
   .day.today{border-color:var(--jam);box-shadow:0 0 0 3px var(--jam-tint), var(--shadow)}
@@ -574,6 +574,7 @@ function flashSaved(msg){
 /* ---------- state ---------- */
 let state = { meals:[], plan:{}, lunch:{}, events:{}, notes:{}, shopping:[] };
 let viewType='dinner';            // schedule cards show 'dinner' or 'lunch'
+let scheduleAnimated=false;       // first schedule paint animates; later ones don't (no flash on swap)
 let editingDate=null, editingType='dinner', chosenEmoji=null, emojiManual=false, outMode=false;
 function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.notes=s.notes||{}; s.shopping=s.shopping||[]; return s; }
 
@@ -677,6 +678,8 @@ function renderProgress(){
 function renderSchedule(){
   const wrap=document.getElementById('schedWrap');
   wrap.innerHTML='';
+  const intro=!scheduleAnimated;          // animate only the very first time
+  wrap.classList.toggle('intro', intro);
   const isDinner=(viewType==='dinner');
   const map = isDinner?state.plan:state.lunch;
   const other = isDinner?state.lunch:state.plan;
@@ -699,7 +702,8 @@ function renderSchedule(){
     const flag = isToday?'<span class="today-flag">Today</span>':'';
     const el=document.createElement('div');
     el.tabIndex=0; el.setAttribute('role','button');
-    el.style.animationDelay=Math.min(idx*10,260)+'ms'; idx++;
+    if(intro) el.style.animationDelay=Math.min(idx*10,260)+'ms';
+    idx++;
     if(ev){
       el.className='day event'+(isToday?' today':'');
       el.innerHTML=`
@@ -735,6 +739,7 @@ function renderSchedule(){
     if(dn) dn.addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,1);});
     wrap.appendChild(el);
   });
+  scheduleAnimated=true;
 }
 function shiftKey(k, dir){
   const d=parseISO(k); d.setDate(d.getDate()+dir);
@@ -982,89 +987,107 @@ function buildSourceSelect(){
 }
 
 /* ---------- one-time starter plan import ---------- */
-const STARTER_BASE=[2026,6,16]; // first entry = Tue 16 Jun 2026
+const STARTER_VERSION='v2';
 const STARTER=[
-  {din:"Tuna steaks", note:"Alt: ham pasta"},
-  {din:"Nando's chicken & halloumi orzo", ds:"TikTok", note:"Alt: sausage pasta"},
-  {ev:"Nana's funeral", lun:"Mac and cheese"},
-  {din:"Chicken harissa spaghetti", ds:"Facebook", lun:"Shakshuka"},
-  {ev:"Tom's pals"},
-  {din:"Roast ham with cabbage cheese"},
-  {din:"Chopped salad", lun:"Cabbage soup", ls:"TikTok"},
-  {ev:"World Cup game"},
-  {din:"Nando's", lun:"Green goddess salad", ls:"TikTok"},
-  {din:"Chipotle shrimp salad with garlic bread"},
-  {din:"Beef, mushroom & green stir fry", ds:"BBC Good Food", lun:"Cheesy lentil soup"},
-  {din:"Chickpea gyros", ds:"TikTok"},
-  {din:"Roast chicken with red cabbage"},
-  {din:"Pad Thai", lun:"Salmon & avocado salad sandwiches"},
-  {din:"Garlic butter salmon", ds:"TikTok", note:"Alt: beef stew"},
-  {ev:"Menorca ✈️"},
-  {din:"Leftover jambalaya"},
-  {din:"Mixed herbs spice bag"},
-  {din:"Salmon pasta"},
-  {din:"Roast ham with red cabbage"},
-  {din:"Picky bits dinner", lun:"Ramen", ls:"TikTok"},
-  {din:"Beef chow mein"},
-  {din:"Slow cooker chicken korma", ds:"Slow Cooker", lun:"Tuna salad with pesto croutons", ls:"Comfort in One"},
-  {din:"Mackerel"},
-  {ev:"Bing cooks"},
-  {din:"Burgers"},
-  {ev:"Ballie Ballerson"},
-  {din:"Peri peri chicken traybake", ds:"BBC Good Food"},
-  {din:"Haddock"},
-  {din:"Steak salad", ds:"TikTok"},
-  {din:"Sloppy Joe pasta", ds:"Comfort in One"},
-  {din:"Mediterranean spice bag"},
-  {din:"Garlic butter & lemon chicken orzo", ds:"Comfort in One"},
-  {din:"Roast chicken with mac and cheese"},
-  {din:"Slow cooker Thai peanut chicken", ds:"Slow Cooker"},
-  {din:"Chimichurri chicken salad", ds:"Comfort in One"},
-  {din:"Salmon curry"},
-  {din:"Breaded chicken salad"},
-  {din:"Spicy steak ramen", ds:"Facebook"},
-  {din:"Lasagna"},
-  {din:"Roast pork with crackling & cabbage cheese"},
-  {din:"Ham & cheese pasta", ds:"Slow Cooker"},
-  {din:"Mackerel"},
-  {din:"Slow cooker daal", ds:"Slow Cooker"},
-  {ev:"Tom's summer party"},
-  {din:"Slow cooker beef brisket ragu", ds:"Slow Cooker"},
-  {din:"Burger bowl", ds:"TikTok"},
-  {din:"Roast lamb with mac and cheese"},
-  {din:"Lamb curry"},
-  {din:"Seafood risotto"},
-  {din:"Chicken Caesar wraps", ds:"TikTok"},
-  {din:"Marmite sausages", ds:"Slow Cooker"},
-  {din:"Hot dogs"},
-  {din:"Green orzo"},
-  {din:"Roast chicken with broccoli cheese"},
-  {din:"Spanish paprika chicken"},
-  {din:"Paella"},
-  {din:"Slow cooker chicken fajitas", ds:"Slow Cooker"},
-  {din:"Steak summer salad", ds:"BBC Good Food"},
-  {din:"Taco bowl", ds:"TikTok"},
-  {din:"Salmon"},
-  {din:"Steak", note:"No roast this week"},
-  {din:"Chickpea & halloumi salad"},
-  {din:"Fish fingers"},
-  {din:"Lemon chicken", ds:"TikTok"},
-  {din:"Prawn curry", ds:"TikTok"},
-  {din:"Fry up"},
-  {din:"Creamy sausage orzo"},
-  {din:"Steak & burrata sandwich", ds:"Facebook", note:"No roast this week"}
+  {k:"2026-06-16", din:"Tuna steaks", note:"Alt: ham pasta"},
+  {k:"2026-06-17", din:"Nando's chicken & halloumi orzo", ds:"TikTok", note:"Alt: sausage pasta"},
+  {k:"2026-06-18", lun:"Mac and cheese", ev:"Nana's funeral"},
+  {k:"2026-06-19", din:"Leftover jambalaya", lun:"Shakshuka"},
+  {k:"2026-06-20", ev:"Tom's pals"},
+  {k:"2026-06-21", din:"Roast ham with cabbage cheese"},
+  {k:"2026-06-22", din:"Chopped salad", lun:"Cabbage soup", ls:"TikTok"},
+  {k:"2026-06-23", ev:"World Cup game"},
+  {k:"2026-06-24", din:"Nando's", lun:"Cans"},
+  {k:"2026-06-25", din:"Chipotle shrimp salad with garlic bread"},
+  {k:"2026-06-26", din:"Beef, mushroom & green stir fry", ds:"BBC Good Food", lun:"Cheesy lentil soup"},
+  {k:"2026-06-27", din:"Chickpea gyros", ds:"TikTok"},
+  {k:"2026-06-28", din:"Roast chicken with red cabbage"},
+  {k:"2026-06-29", din:"Pad Thai", lun:"Salmon & avocado salad sandwiches"},
+  {k:"2026-06-30", din:"Garlic butter salmon", ds:"TikTok", note:"Alt: beef stew"},
+  {k:"2026-07-01", ev:"Menorca ✈️"},
+  {k:"2026-07-02", ev:"Menorca ✈️"},
+  {k:"2026-07-03", ev:"Menorca ✈️"},
+  {k:"2026-07-04", ev:"Menorca ✈️"},
+  {k:"2026-07-05", ev:"Menorca ✈️"},
+  {k:"2026-07-06", ev:"Menorca ✈️"},
+  {k:"2026-07-07", ev:"Menorca ✈️"},
+  {k:"2026-07-08", ev:"Menorca ✈️"},
+  {k:"2026-07-09", din:"Leftover beef stew"},
+  {k:"2026-07-10", din:"Mixed herbs spice bag"},
+  {k:"2026-07-11", din:"Salmon pasta"},
+  {k:"2026-07-12", din:"Roast ham with red cabbage"},
+  {k:"2026-07-13", din:"Picky bits dinner", lun:"Green goddess salad", ls:"TikTok"},
+  {k:"2026-07-14", din:"Beef chow mein"},
+  {k:"2026-07-15", din:"Slow cooker chicken korma", ds:"Slow Cooker", lun:"Ramen", ls:"TikTok"},
+  {k:"2026-07-16", din:"Mackerel", note:"Alt: beef stew"},
+  {k:"2026-07-17", ev:"Bing cooks"},
+  {k:"2026-07-18", din:"Burgers"},
+  {k:"2026-07-19", ev:"Ballie Ballerson"},
+  {k:"2026-07-20", din:"Chicken harissa spaghetti", ds:"Facebook", lun:"Tuna salad with pesto croutons", ls:"Comfort in One"},
+  {k:"2026-07-21", din:"Haddock"},
+  {k:"2026-07-22", din:"Steak salad", ds:"TikTok"},
+  {k:"2026-07-23", din:"Sloppy Joe pasta", ds:"Comfort in One"},
+  {k:"2026-07-24", din:"Mediterranean spice bag"},
+  {k:"2026-07-25", din:"Garlic butter & lemon chicken orzo", ds:"Comfort in One"},
+  {k:"2026-07-26", din:"Roast chicken with mac and cheese"},
+  {k:"2026-07-27", din:"Slow cooker Thai peanut chicken", ds:"Slow Cooker"},
+  {k:"2026-07-28", din:"Chimichurri chicken salad", ds:"Comfort in One"},
+  {k:"2026-07-29", din:"Salmon curry"},
+  {k:"2026-07-30", din:"Breaded chicken salad"},
+  {k:"2026-07-31", din:"Spicy steak ramen", ds:"Facebook"},
+  {k:"2026-08-01", din:"Lasagna"},
+  {k:"2026-08-02", din:"Roast pork with crackling & cabbage cheese"},
+  {k:"2026-08-03", din:"Ham & cheese pasta", ds:"Slow Cooker"},
+  {k:"2026-08-04", din:"Mackerel"},
+  {k:"2026-08-05", din:"Slow cooker daal", ds:"Slow Cooker"},
+  {k:"2026-08-06", ev:"Tom's summer party"},
+  {k:"2026-08-07", din:"Slow cooker beef brisket ragu", ds:"Slow Cooker"},
+  {k:"2026-08-08", din:"Peri peri chicken traybake", ds:"BBC Good Food"},
+  {k:"2026-08-09", din:"Roast lamb with mac and cheese"},
+  {k:"2026-08-10", din:"Lamb curry"},
+  {k:"2026-08-11", din:"Seafood risotto"},
+  {k:"2026-08-12", din:"Chicken Caesar wraps", ds:"TikTok"},
+  {k:"2026-08-13", din:"Marmite sausages", ds:"Slow Cooker"},
+  {k:"2026-08-14", din:"Hot dogs"},
+  {k:"2026-08-15", din:"Green orzo"},
+  {k:"2026-08-16", din:"Roast chicken with broccoli cheese"},
+  {k:"2026-08-17", din:"Spanish paprika chicken"},
+  {k:"2026-08-18", din:"Paella"},
+  {k:"2026-08-19", din:"Slow cooker chicken fajitas", ds:"Slow Cooker"},
+  {k:"2026-08-20", din:"Steak summer salad", ds:"BBC Good Food"},
+  {k:"2026-08-21", din:"Taco bowl", ds:"TikTok"},
+  {k:"2026-08-22", din:"Salmon"},
+  {k:"2026-08-23", din:"Steak", note:"No roast this week"},
+  {k:"2026-08-24", din:"Chickpea & halloumi salad"},
+  {k:"2026-08-25", din:"Fish fingers"},
+  {k:"2026-08-26", din:"Lemon chicken", ds:"TikTok"},
+  {k:"2026-08-27", din:"Prawn curry", ds:"TikTok"},
+  {k:"2026-08-28", din:"Fry up"},
+  {k:"2026-08-29", din:"Creamy sausage orzo"},
+  {k:"2026-08-30", din:"Steak & burrata sandwich", ds:"Facebook", note:"No roast this week"},
+  {k:"2026-09-01", din:"Burger bowl", ds:"TikTok"},
+  {k:"2026-09-02", din:"Sausage and leek pasta", ds:"TikTok"},
+  {k:"2026-09-04", din:"Lasagna soup"},
+  {k:"2026-09-06", din:"Roast ham with broccoli cheese"},
+  {k:"2026-09-07", din:"Chopped salad"},
+  {k:"2026-09-08", din:"Prawn harissa spaghetti"},
+  {k:"2026-09-13", din:"Roast chicken"},
+  {k:"2026-09-20", din:"Roast beef"},
+  {k:"2026-09-21", din:"Peanut butter beef noodles"},
+  {k:"2026-09-27", din:"Roast ham"},
+  {k:"2026-10-04", din:"Roast chicken"}
 ];
 function importStarter(){
-  const base=new Date(STARTER_BASE[0], STARTER_BASE[1]-1, STARTER_BASE[2]);
-  STARTER.forEach((e,i)=>{
-    const d=new Date(base); d.setDate(base.getDate()+i);
-    const k=iso(d);
-    if(e.ev && !state.events[k]) state.events[k]=e.ev;
-    if(e.din && !state.events[k] && !state.plan[k]){ const m=ensureMeal(e.din, null, e.ds||''); state.plan[k]=m.id; }
-    if(e.lun && !state.lunch[k]){ const m=ensureMeal(e.lun, null, e.ls||''); state.lunch[k]=m.id; }
-    if(e.note && !state.notes[k]) state.notes[k]=e.note;
+  // full repopulate: clear the auto-planned schedule, keep the meals library + shopping list
+  state.plan={}; state.lunch={}; state.events={}; state.notes={};
+  STARTER.forEach(e=>{
+    const k=e.k;
+    if(e.ev) state.events[k]=e.ev;
+    if(e.din){ const m=ensureMeal(e.din, null, e.ds||''); state.plan[k]=m.id; }
+    if(e.lun){ const m=ensureMeal(e.lun, null, e.ls||''); state.lunch[k]=m.id; }
+    if(e.note) state.notes[k]=e.note;
   });
-  state.imported='v1';
+  state.imported=STARTER_VERSION;
   saveData(state);
 }
 
@@ -1097,7 +1120,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
   const saved=await loadData();
   if(saved && saved.meals){ state=ensureModel(saved); }
   else { state=ensureModel({ meals: SEED_MEALS.map(n=>({id:uid(),name:n,emoji:mealEmoji(n),source:''})), plan:{} }); saveData(state); }
-  if(state.imported!=='v1'){ importStarter(); }
+  if(state.imported!==STARTER_VERSION){ importStarter(); }
   render();
 })();
 </script>
