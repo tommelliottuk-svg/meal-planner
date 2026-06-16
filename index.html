@@ -64,9 +64,7 @@
   .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--sage),var(--jam));border-radius:999px;transition:width .4s ease}
 
   /* tabs */
-  .tabs{max-width:680px;margin:6px auto 0;padding:0 20px;display:flex;gap:8px;
-    overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none}
-  .tabs::-webkit-scrollbar{display:none}
+  .tabs{max-width:680px;margin:6px auto 0;padding:0 20px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
   .tab{
     appearance:none;border:1px solid var(--line);background:var(--card);
     font:inherit;font-weight:700;font-size:14px;color:var(--ink-soft);
@@ -300,6 +298,29 @@
   .shop-item.done .stext{text-decoration:line-through;color:var(--ink-soft)}
   #shopFoot{margin-top:10px}
 
+  /* AI ingredients button */
+  .ai-btn{width:100%;margin-top:6px}
+  .ai-hint{font-size:12.5px;color:var(--ink-soft);margin-top:8px;min-height:1em;text-align:center;line-height:1.4}
+  .ai-hint b{color:var(--jam)}
+
+  /* segmented office/home toggle */
+  #officeRow{margin-bottom:4px}
+  .seg{display:flex;gap:8px}
+  .seg-btn{flex:1;appearance:none;border:1px solid var(--line);background:var(--card);font:inherit;
+    font-weight:700;font-size:14px;color:var(--ink-soft);padding:11px 6px;border-radius:12px;cursor:pointer;transition:.12s}
+  .seg-btn.on{border-color:var(--sage);background:var(--sage-tint);color:#3f5a34}
+  .link-input{font-size:14px !important}
+
+  /* day-card badges (office / recipe link) */
+  .badges{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px}
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;
+    padding:3px 8px;border-radius:999px;white-space:nowrap}
+  .pill.office{background:#e9eef9;color:#3b5b8c}
+  .pill.home{background:var(--sage-tint);color:#3f5a34}
+  .recipe-link{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;
+    padding:3px 8px;border-radius:999px;background:var(--jam-tint);color:var(--jam-deep);text-decoration:none}
+  .recipe-link:active{transform:scale(.96)}
+
   @media (max-width:420px){
     h1{font-size:29px}
     .meal-name{font-size:16px}
@@ -377,6 +398,15 @@
       <input class="name" id="eventInput" type="text" placeholder="e.g. World Cup game, Menorca…" autocomplete="off" />
     </div>
 
+    <div id="officeRow">
+      <div class="lbl">Working from</div>
+      <div class="seg" id="officeSeg">
+        <button type="button" class="seg-btn" data-office="home">🏠 Home</button>
+        <button type="button" class="seg-btn" data-office="office">🏢 Office</button>
+        <button type="button" class="seg-btn" data-office="">—</button>
+      </div>
+    </div>
+
     <div id="mealFields">
       <div class="field-row">
         <div class="plate preview-plate" id="previewPlate">🍽️</div>
@@ -389,8 +419,14 @@
       <div class="lbl">Recipe location</div>
       <div class="src-select"><select id="srcSelect"></select></div>
 
+      <div class="lbl">Recipe link (optional)</div>
+      <input class="name link-input" id="urlInput" type="url" inputmode="url" placeholder="Paste TikTok / BBC Good Food URL…" autocomplete="off" />
+
       <div class="lbl" id="repeatLbl">From your meals</div>
       <div class="chips" id="repeatChips"></div>
+
+      <button type="button" class="btn ghost ai-btn" id="ingBtn">🧾 Add ingredients to shopping list</button>
+      <div class="ai-hint" id="ingHint"></div>
     </div>
 
     <div id="noteWrap">
@@ -575,8 +611,8 @@ function flashSaved(msg){
 let state = { meals:[], plan:{}, lunch:{}, events:{}, notes:{}, shopping:[] };
 let viewType='dinner';            // schedule cards show 'dinner' or 'lunch'
 let scheduleAnimated=false;       // first schedule paint animates; later ones don't (no flash on swap)
-let editingDate=null, editingType='dinner', chosenEmoji=null, emojiManual=false, outMode=false;
-function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.notes=s.notes||{}; s.shopping=s.shopping||[]; return s; }
+let editingDate=null, editingType='dinner', chosenEmoji=null, emojiManual=false, outMode=false, officeChoice='';
+function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.notes=s.notes||{}; s.office=s.office||{}; s.shopping=s.shopping||[]; return s; }
 
 const SEED_MEALS=[
   'Spaghetti Bolognese','Chicken Curry','Tacos','Veggie Stir Fry',
@@ -595,6 +631,25 @@ function sourceMeta(id){ return SOURCES.find(s=>s.id===id)||null; }
 function srcTag(source){
   const s=sourceMeta(source); if(!s) return '';
   return `<span class="src-tag" style="--dot:${s.dot}">${s.em} ${escapeHtml(s.id)}</span>`;
+}
+function officeTag(k){
+  const v=state.office[k];
+  if(v==='office') return '<span class="pill office">🏢 Office</span>';
+  if(v==='home') return '<span class="pill home">🏠 Home</span>';
+  return '';
+}
+function safeUrl(u){
+  u=(u||'').trim(); if(!u) return '';
+  if(!/^https?:\/\//i.test(u)) u='https://'+u;
+  return u;
+}
+function recipeLink(meal){
+  if(!meal || !meal.url) return '';
+  return `<a class="recipe-link" href="${escapeHtml(meal.url)}" target="_blank" rel="noopener">🔗 Recipe</a>`;
+}
+function badges(k, meal){
+  const inner = officeTag(k) + (meal?recipeLink(meal):'');
+  return inner ? `<div class="badges">${inner}</div>` : '';
 }
 
 /* ---------- who + last updated ---------- */
@@ -713,6 +768,7 @@ function renderSchedule(){
           <div class="meal-name">${escapeHtml(ev)}${flag}</div>
           <span class="src-tag" style="--dot:#B23A66">🚫 Out — not cooking</span>
           ${otherMeal?`<div class="sub-line">🥪 Lunch: ${escapeHtml(otherMeal.name)}</div>`:''}
+          ${badges(k, null)}
         </div>`;
     } else {
       const emptyEmoji = isDinner?'🍳':'🥪';
@@ -726,13 +782,14 @@ function renderSchedule(){
           ${meal?srcTag(meal.source):''}
           ${note?`<div class="sub-line note">📝 ${escapeHtml(note)}</div>`:''}
           ${otherMeal?`<div class="sub-line">${isDinner?'🥪 Lunch':'🍽️ Dinner'}: ${escapeHtml(otherMeal.name)}</div>`:''}
+          ${badges(k, meal)}
         </div>
         <div class="nudge">
           <button class="up" aria-label="Move to previous day" ${meal?'':'disabled'}>${ICON.up}</button>
           <button class="dn" aria-label="Move to next day" ${meal?'':'disabled'}>${ICON.down}</button>
         </div>`;
     }
-    el.addEventListener('click',(e)=>{ if(e.target.closest('.nudge')) return; openEditor(k); });
+    el.addEventListener('click',(e)=>{ if(e.target.closest('.nudge')||e.target.closest('.recipe-link')) return; openEditor(k); });
     el.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();openEditor(k);} });
     const up=el.querySelector('.up'), dn=el.querySelector('.dn');
     if(up) up.addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,-1);});
@@ -811,10 +868,15 @@ function setOut(on){
   outMode=on;
   document.getElementById('outFields').style.display=on?'block':'none';
   document.getElementById('mealFields').style.display=on?'none':'block';
+  document.getElementById('officeRow').style.display=on?'none':'block';
   const t=document.getElementById('outToggle');
   t.textContent = on?'🚫 Out / not cooking — tap to switch back':'🍽️ Eating in (tap if you\'re out)';
   t.classList.toggle('on',on);
   if(on) setTimeout(()=>document.getElementById('eventInput').focus(),60);
+}
+function setOffice(v){
+  officeChoice=v||'';
+  document.querySelectorAll('#officeSeg .seg-btn').forEach(b=>b.classList.toggle('on', (b.dataset.office||'')===officeChoice));
 }
 function openEditor(k){
   editingDate=k; editingType=viewType; emojiManual=false;
@@ -823,6 +885,9 @@ function openEditor(k){
   document.getElementById('sheetDate').textContent=`${DOW[d.getDay()]}, ${MON[d.getMonth()]} ${d.getDate()}`;
   document.getElementById('outRow').style.display = isDinner?'block':'none';
   document.getElementById('noteWrap').style.display = isDinner?'block':'none';
+  document.getElementById('officeRow').style.display = 'block';
+  setOffice(state.office[k]||'');
+  const ingHint=document.getElementById('ingHint'); if(ingHint) ingHint.textContent='';
   const map = isDinner?state.plan:state.lunch;
   const meal=findMeal(map[k]);
   const ev = isDinner ? (state.events[k]||'') : '';
@@ -835,6 +900,7 @@ function openEditor(k){
   emojiManual = !!meal;
   updatePreview(); buildEmojiPicker(); buildRepeatChips();
   document.getElementById('srcSelect').value = meal?(meal.source||''):'';
+  document.getElementById('urlInput').value = meal?(meal.url||''):'';
   if(isDinner){
     document.getElementById('eventInput').value = ev;
     document.getElementById('noteInput').value = state.notes[k]||'';
@@ -871,6 +937,7 @@ function buildRepeatChips(){
     c.addEventListener('click',()=>{
       document.getElementById('mealInput').value=m.name;
       document.getElementById('srcSelect').value=m.source||'';
+      document.getElementById('urlInput').value=m.url||'';
       chosenEmoji=m.emoji; emojiManual=true; updatePreview(); buildEmojiPicker();
     });
     wrap.appendChild(c);
@@ -888,6 +955,7 @@ function closeSheet(){
 function saveEditor(){
   const k=editingDate; if(!k){ closeSheet(); return; }
   const isDinner=(editingType==='dinner');
+  const url=safeUrl(document.getElementById('urlInput').value);
   if(isDinner){
     const note=document.getElementById('noteInput').value.trim();
     if(outMode){
@@ -896,15 +964,16 @@ function saveEditor(){
     } else {
       delete state.events[k];
       const name=document.getElementById('mealInput').value.trim();
-      if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; state.plan[k]=m.id; }
+      if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; m.url=url; state.plan[k]=m.id; }
       else { delete state.plan[k]; }
     }
     if(note) state.notes[k]=note; else delete state.notes[k];
   } else {
     const name=document.getElementById('mealInput').value.trim();
-    if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; state.lunch[k]=m.id; }
+    if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; m.url=url; state.lunch[k]=m.id; }
     else { delete state.lunch[k]; }
   }
+  if(officeChoice) state.office[k]=officeChoice; else delete state.office[k];
   saveData(state); render(); closeSheet();
 }
 function clearDay(){
@@ -976,6 +1045,34 @@ function addShopItem(){
   const inp=document.getElementById('shopInput'); const v=inp.value.trim(); if(!v) return;
   if(!state.shopping) state.shopping=[];
   state.shopping.push({id:uid(),text:v,done:false}); inp.value=''; saveData(state); renderShopping();
+}
+async function addIngredients(){
+  const name=document.getElementById('mealInput').value.trim();
+  const hint=document.getElementById('ingHint');
+  const btn=document.getElementById('ingBtn');
+  if(!name){ hint.textContent='Type a meal name first.'; return; }
+  if(!serverMode){ hint.innerHTML='This runs on your live site once your Gemini key is added — it can\'t work here in the preview.'; return; }
+  const source=document.getElementById('srcSelect').value||'';
+  const label=btn.textContent;
+  btn.disabled=true; btn.textContent='🧾 Thinking…'; hint.textContent='';
+  try{
+    const res=await fetch('/api/ingredients',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({meals:[{name,source}],people:2})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok){ hint.textContent = data.message || ('Couldn\'t get ingredients (error '+res.status+').'); return; }
+    const items=data.ingredients||[];
+    if(items.length===0){ hint.textContent='No ingredients came back — give it another go.'; return; }
+    if(!state.shopping) state.shopping=[];
+    const have=new Set(state.shopping.map(s=>s.text.trim().toLowerCase()));
+    let added=0;
+    items.forEach(t=>{ const key=String(t).trim().toLowerCase(); if(key && !have.has(key)){ state.shopping.push({id:uid(),text:String(t).trim(),done:false}); have.add(key); added++; } });
+    saveData(state); renderShopping();
+    const dup=items.length-added;
+    hint.innerHTML='Added <b>'+added+'</b> item'+(added===1?'':'s')+' to your 🛒 Shopping list'+(dup>0?' ('+dup+' already on it)':'')+'.';
+  }catch(e){
+    hint.textContent='Network error — try again.';
+  }finally{
+    btn.disabled=false; btn.textContent=label;
+  }
 }
 
 /* ---------- util ---------- */
@@ -1101,6 +1198,9 @@ document.getElementById('cancelBtn').addEventListener('click',closeSheet);
 document.getElementById('clearBtn').addEventListener('click',clearDay);
 document.getElementById('scrim').addEventListener('click',closeSheet);
 document.getElementById('outToggle').addEventListener('click',()=>setOut(!outMode));
+document.getElementById('ingBtn').addEventListener('click',addIngredients);
+document.getElementById('officeSeg').addEventListener('click',e=>{ const b=e.target.closest('.seg-btn'); if(b) setOffice(b.dataset.office||''); });
+document.getElementById('urlInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditor();});
 document.getElementById('mealInput').addEventListener('input',onMealInput);
 document.getElementById('mealInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditor();});
 document.getElementById('eventInput').addEventListener('keydown',e=>{if(e.key==='Enter')saveEditor();});
