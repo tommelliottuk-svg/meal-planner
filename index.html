@@ -298,6 +298,21 @@
   .shop-item.done .stext{text-decoration:line-through;color:var(--ink-soft)}
   #shopFoot{margin-top:10px}
 
+  /* aisle order editor */
+  .aisle-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 14px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .aisle-box summary{cursor:pointer;font-weight:800;font-size:14px;color:var(--ink);padding:9px 0;list-style:none}
+  .aisle-box summary::-webkit-details-marker{display:none}
+  .aisle-box summary::before{content:'▸ ';color:var(--ink-soft)}
+  .aisle-box[open] summary::before{content:'▾ '}
+  .aisle-hint{font-size:12px;color:var(--ink-soft);margin:2px 0 8px}
+  #aisleText{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:10px;
+    font:inherit;font-size:14px;background:var(--paper);resize:vertical;margin-bottom:8px}
+  .aisle-saved{margin-left:10px;font-size:12.5px;font-weight:700;color:var(--sage)}
+  .aisle-head{font-family:"Fraunces",serif;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--jam);margin:14px 2px 8px;display:flex;align-items:center;gap:8px}
+  .aisle-head::after{content:'';flex:1;height:1px;background:var(--line)}
+  #shopList .aisle-head:first-child{margin-top:2px}
+
   /* AI ingredients button */
   .ai-btn{width:100%;margin-top:6px}
   .ai-hint{font-size:12.5px;color:var(--ink-soft);margin-top:8px;min-height:1em;text-align:center;line-height:1.4}
@@ -373,6 +388,13 @@
         <input id="shopInput" type="text" placeholder="Add to shopping list…" autocomplete="off" />
         <button class="btn" id="shopAddBtn">Add</button>
       </div>
+      <details class="aisle-box" id="aisleBox">
+        <summary>🧭 Aisle order</summary>
+        <p class="aisle-hint">One aisle per line, in the order you walk your shop. The list (and AI ingredients) get sorted to match.</p>
+        <textarea id="aisleText" rows="9" spellcheck="false"></textarea>
+        <button class="btn" id="aisleSave">Save aisle order</button>
+        <span class="aisle-saved" id="aisleSaved"></span>
+      </details>
       <div id="shopList"></div>
       <div id="shopFoot"></div>
     </section>
@@ -612,7 +634,8 @@ let state = { meals:[], plan:{}, lunch:{}, events:{}, notes:{}, shopping:[] };
 let viewType='dinner';            // schedule cards show 'dinner' or 'lunch'
 let scheduleAnimated=false;       // first schedule paint animates; later ones don't (no flash on swap)
 let editingDate=null, editingType='dinner', chosenEmoji=null, emojiManual=false, outMode=false, officeChoice='';
-function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.notes=s.notes||{}; s.office=s.office||{}; s.shopping=s.shopping||[]; return s; }
+const DEFAULT_AISLES=['Fruit & veg','Bakery','Meat & fish','Dairy & eggs','Chilled','Frozen','Tins, jars & cooking','Pasta, rice & noodles','World foods','Herbs & spices','Snacks','Drinks','Household'];
+function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.notes=s.notes||{}; s.office=s.office||{}; s.shopping=s.shopping||[]; if(!Array.isArray(s.aisles)) s.aisles=DEFAULT_AISLES.slice(); return s; }
 
 const SEED_MEALS=[
   'Spaghetti Bolognese','Chicken Curry','Tacos','Veggie Stir Fry',
@@ -1021,13 +1044,23 @@ function renderShopping(){
   const list=document.getElementById('shopList');
   const foot=document.getElementById('shopFoot');
   if(!list) return;
+  // keep the aisle editor in sync (but don't clobber while they're typing in it)
+  const at=document.getElementById('aisleText');
+  if(at && document.activeElement!==at) at.value=(state.aisles||[]).join('\n');
   list.innerHTML='';
   const items=state.shopping||[];
   if(items.length===0){
-    list.innerHTML='<div class="empty-state"><div class="big">🛒</div>Your shopping list is empty. Add what you need above — it syncs to both of you.</div>';
+    list.innerHTML='<div class="empty-state"><div class="big">🛒</div>Your shopping list is empty. Add items above, or tap “Add ingredients” on a meal.</div>';
     foot.innerHTML=''; return;
   }
-  items.forEach(it=>{
+  const order=(state.aisles&&state.aisles.length)?state.aisles.slice():[];
+  const groups=new Map();
+  items.forEach(it=>{ const a=(it.aisle && order.includes(it.aisle))?it.aisle:'Other'; if(!groups.has(a)) groups.set(a,[]); groups.get(a).push(it); });
+  const ordered=[...order.filter(a=>groups.has(a))];
+  if(groups.has('Other')) ordered.push('Other');
+  const grouped = order.length>0 && ordered.length>1; // only show headings if it helps
+
+  function rowFor(it){
     const row=document.createElement('div'); row.className='shop-item'+(it.done?' done':'');
     row.innerHTML=`
       <button class="check" aria-label="Tick off">${it.done?'✓':''}</button>
@@ -1035,16 +1068,30 @@ function renderShopping(){
       <button class="iconbtn del" aria-label="Delete">${ICON.trash}</button>`;
     row.querySelector('.check').addEventListener('click',()=>{ it.done=!it.done; saveData(state); renderShopping(); });
     row.querySelector('.del').addEventListener('click',()=>{ state.shopping=state.shopping.filter(x=>x.id!==it.id); saveData(state); renderShopping(); });
-    list.appendChild(row);
-  });
+    return row;
+  }
+  if(grouped){
+    ordered.forEach(a=>{
+      const h=document.createElement('div'); h.className='aisle-head'; h.textContent=a;
+      list.appendChild(h);
+      groups.get(a).forEach(it=>list.appendChild(rowFor(it)));
+    });
+  } else {
+    items.forEach(it=>list.appendChild(rowFor(it)));
+  }
   const done=items.filter(i=>i.done).length;
   foot.innerHTML = done?`<button class="btn ghost" id="clearChecked">Clear ${done} ticked item${done>1?'s':''}</button>`:'';
   if(done){ document.getElementById('clearChecked').addEventListener('click',()=>{ state.shopping=state.shopping.filter(i=>!i.done); saveData(state); renderShopping(); }); }
 }
+function saveAisles(){
+  const lines=document.getElementById('aisleText').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  state.aisles=lines; saveData(state); renderShopping();
+  const s=document.getElementById('aisleSaved'); if(s){ s.textContent='Saved ✓'; setTimeout(()=>{s.textContent='';},1800); }
+}
 function addShopItem(){
   const inp=document.getElementById('shopInput'); const v=inp.value.trim(); if(!v) return;
   if(!state.shopping) state.shopping=[];
-  state.shopping.push({id:uid(),text:v,done:false}); inp.value=''; saveData(state); renderShopping();
+  state.shopping.push({id:uid(),text:v,aisle:'Other',done:false}); inp.value=''; saveData(state); renderShopping();
 }
 async function addIngredients(){
   const name=document.getElementById('mealInput').value.trim();
@@ -1053,21 +1100,23 @@ async function addIngredients(){
   if(!name){ hint.textContent='Type a meal name first.'; return; }
   if(!serverMode){ hint.innerHTML='This runs on your live site once your Gemini key is added — it can\'t work here in the preview.'; return; }
   const source=document.getElementById('srcSelect').value||'';
+  const url=safeUrl(document.getElementById('urlInput').value);
   const label=btn.textContent;
-  btn.disabled=true; btn.textContent='🧾 Thinking…'; hint.textContent='';
+  btn.disabled=true; btn.textContent= url?'🧾 Reading recipe…':'🧾 Thinking…'; hint.textContent='';
   try{
-    const res=await fetch('/api/ingredients',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({meals:[{name,source}],people:2})});
+    const res=await fetch('/api/ingredients',{method:'POST',headers:authHeaders({'Content-Type':'application/json'}),body:JSON.stringify({meals:[{name,source,url}],people:2,aisles:state.aisles||[]})});
     const data=await res.json().catch(()=>({}));
     if(!res.ok){ hint.textContent = data.message || ('Couldn\'t get ingredients (error '+res.status+').'); return; }
-    const items=data.ingredients||[];
+    const items=data.items||[];
     if(items.length===0){ hint.textContent='No ingredients came back — give it another go.'; return; }
     if(!state.shopping) state.shopping=[];
     const have=new Set(state.shopping.map(s=>s.text.trim().toLowerCase()));
     let added=0;
-    items.forEach(t=>{ const key=String(t).trim().toLowerCase(); if(key && !have.has(key)){ state.shopping.push({id:uid(),text:String(t).trim(),done:false}); have.add(key); added++; } });
+    items.forEach(o=>{ const text=String(o.item||'').trim(); const key=text.toLowerCase(); if(text && !have.has(key)){ state.shopping.push({id:uid(),text,aisle:o.aisle||'Other',done:false}); have.add(key); added++; } });
     saveData(state); renderShopping();
     const dup=items.length-added;
-    hint.innerHTML='Added <b>'+added+'</b> item'+(added===1?'':'s')+' to your 🛒 Shopping list'+(dup>0?' ('+dup+' already on it)':'')+'.';
+    const src = data.via==='recipe' ? ' from the recipe' : (data.via==='page' ? ' from the recipe page' : ' (estimated from the name)');
+    hint.innerHTML='Added <b>'+added+'</b> item'+(added===1?'':'s')+src+' to 🛒 Shopping'+(dup>0?' ('+dup+' already on it)':'')+'.';
   }catch(e){
     hint.textContent='Network error — try again.';
   }finally{
@@ -1209,6 +1258,7 @@ document.getElementById('libAddBtn').addEventListener('click',addLibMeal);
 document.getElementById('libInput').addEventListener('keydown',e=>{if(e.key==='Enter')addLibMeal();});
 document.getElementById('shopAddBtn').addEventListener('click',addShopItem);
 document.getElementById('shopInput').addEventListener('keydown',e=>{if(e.key==='Enter')addShopItem();});
+document.getElementById('aisleSave').addEventListener('click',saveAisles);
 document.getElementById('youChip').addEventListener('click',setMyName);
 document.getElementById('connChip').addEventListener('click',connHelp);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
