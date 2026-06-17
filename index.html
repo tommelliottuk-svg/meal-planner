@@ -96,6 +96,17 @@
   .schedwrap.intro .day{animation:rise .4s ease both}
   .day:hover{transform:translateY(-1px)}
   .day:focus-within{border-color:var(--jam)}
+
+  /* drag & drop */
+  .drag-handle{flex:none;display:flex;align-items:center;justify-content:center;width:30px;align-self:stretch;
+    padding:0;margin:0;border:0;background:none;color:var(--line);cursor:grab;touch-action:none;border-radius:10px}
+  .drag-handle:hover{color:var(--ink-soft)}
+  .drag-handle svg{width:20px;height:20px}
+  .drag-handle:active{cursor:grabbing}
+  .day.lifted{opacity:.35}
+  .day.drop-target{border-color:var(--jam);background:var(--jam-tint);box-shadow:0 0 0 2px var(--jam) inset}
+  .drag-ghost{position:fixed;left:0;top:0;z-index:2000;pointer-events:none;margin:0;
+    box-shadow:0 14px 34px rgba(40,20,10,.28);opacity:.97;transform:translate(-9999px,-9999px);transition:none}
   .day.today{border-color:var(--jam);box-shadow:0 0 0 3px var(--jam-tint), var(--shadow)}
   .day.empty .meal-name{color:var(--ink-soft);font-style:italic;font-family:"Nunito Sans",sans-serif;font-weight:600;font-size:15px}
 
@@ -471,7 +482,8 @@ const ICON = {
   up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
   down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
-  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>'
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>',
+  grip:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>'
 };
 
 /* ---------- emoji matcher: turns a meal name into a cute icon ---------- */
@@ -786,6 +798,7 @@ function renderSchedule(){
     const flag = isToday?'<span class="today-flag">Today</span>':'';
     const el=document.createElement('div');
     el.tabIndex=0; el.setAttribute('role','button');
+    el.dataset.key=k;
     if(intro) el.style.animationDelay=Math.min(idx*10,260)+'ms';
     idx++;
     if(ev){
@@ -794,6 +807,7 @@ function renderSchedule(){
         ? (otherMeal?`<div class="sub-line">🥪 Lunch: ${escapeHtml(otherMeal.name)}</div>`:'')
         : (otherMeal?`<div class="sub-line">🍽️ Dinner: ${escapeHtml(otherMeal.name)}</div>`:'');
       el.className='day event'+(isToday?' today':'');
+      el.dataset.locked='1';
       el.innerHTML=`
         <div class="datecol"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>
         <div class="plate ev">🎈</div>
@@ -817,12 +831,13 @@ function renderSchedule(){
           ${otherMeal?`<div class="sub-line">${isDinner?'🥪 Lunch':'🍽️ Dinner'}: ${escapeHtml(otherMeal.name)}</div>`:''}
           ${badges(k, meal)}
         </div>
+        ${meal?`<button class="drag-handle" aria-label="Drag to move meal">${ICON.grip}</button>`:''}
         <div class="nudge">
           <button class="up" aria-label="Move to previous day" ${meal?'':'disabled'}>${ICON.up}</button>
           <button class="dn" aria-label="Move to next day" ${meal?'':'disabled'}>${ICON.down}</button>
         </div>`;
     }
-    el.addEventListener('click',(e)=>{ if(e.target.closest('.nudge')||e.target.closest('.recipe-link')) return; openEditor(k); });
+    el.addEventListener('click',(e)=>{ if(justDragged||e.target.closest('.nudge')||e.target.closest('.recipe-link')||e.target.closest('.drag-handle')) return; openEditor(k); });
     el.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();openEditor(k);} });
     const up=el.querySelector('.up'), dn=el.querySelector('.dn');
     if(up) up.addEventListener('click',(e)=>{e.stopPropagation();swapDay(k,-1);});
@@ -842,6 +857,72 @@ function swapDay(k, dir){
   if(b===undefined||b===null) delete map[k]; else map[k]=b;
   if(a===undefined||a===null) delete map[k2]; else map[k2]=a;
   saveData(state); render();
+}
+function moveMeal(fromK, toK){
+  if(fromK===toK) return;
+  const map = (viewType==='lunch')?state.lunch:state.plan;
+  const a=map[fromK], b=map[toK];
+  if(b===undefined||b===null) delete map[fromK]; else map[fromK]=b;
+  if(a===undefined||a===null) delete map[toK]; else map[toK]=a;
+  saveData(state); render();
+}
+
+/* ---------- drag & drop (pointer-based, works on touch + mouse) ---------- */
+let drag=null, justDragged=false;
+function initDrag(){
+  const wrap=document.getElementById('schedWrap');
+  wrap.addEventListener('pointerdown', e=>{
+    const handle=e.target.closest('.drag-handle');
+    if(!handle) return;
+    const card=handle.closest('.day');
+    if(!card || !card.dataset.key) return;
+    e.preventDefault();
+    const rect=card.getBoundingClientRect();
+    handle.setPointerCapture(e.pointerId);
+    drag={ key:card.dataset.key, card, handle, pointerId:e.pointerId,
+           startX:e.clientX, startY:e.clientY, dx:e.clientX-rect.left, dy:e.clientY-rect.top,
+           w:rect.width, active:false, ghost:null, target:null };
+    handle.addEventListener('pointermove', onDragMove);
+    handle.addEventListener('pointerup', onDragEnd);
+    handle.addEventListener('pointercancel', onDragEnd);
+  });
+}
+function onDragMove(e){
+  if(!drag) return;
+  if(!drag.active){
+    if(Math.hypot(e.clientX-drag.startX, e.clientY-drag.startY) < 6) return;
+    drag.active=true;
+    drag.card.classList.add('lifted');
+    const g=drag.card.cloneNode(true);
+    g.classList.add('drag-ghost'); g.classList.remove('lifted');
+    g.style.width=drag.w+'px';
+    document.body.appendChild(g);
+    drag.ghost=g;
+  }
+  e.preventDefault();
+  if(drag.ghost) drag.ghost.style.transform=`translate(${e.clientX-drag.dx}px, ${e.clientY-drag.dy}px)`;
+  const el=document.elementFromPoint(e.clientX, e.clientY);
+  const card=el && el.closest('.day');
+  let tgt=null;
+  if(card && card!==drag.card && card.dataset.key && !card.dataset.locked) tgt=card;
+  if(drag.target && drag.target!==tgt) drag.target.classList.remove('drop-target');
+  if(tgt) tgt.classList.add('drop-target');
+  drag.target=tgt;
+}
+function onDragEnd(){
+  if(!drag) return;
+  const d=drag; drag=null;
+  try{ d.handle.releasePointerCapture(d.pointerId); }catch(e){}
+  d.handle.removeEventListener('pointermove', onDragMove);
+  d.handle.removeEventListener('pointerup', onDragEnd);
+  d.handle.removeEventListener('pointercancel', onDragEnd);
+  if(d.ghost) d.ghost.remove();
+  if(d.card) d.card.classList.remove('lifted');
+  if(d.target) d.target.classList.remove('drop-target');
+  if(d.active){
+    justDragged=true; setTimeout(()=>{ justDragged=false; }, 350);
+    if(d.target && d.target.dataset.key) moveMeal(d.key, d.target.dataset.key);
+  }
 }
 
 /* ---------- favourites leaderboard ---------- */
@@ -1289,6 +1370,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
   if(saved && saved.meals){ state=ensureModel(saved); }
   else { state=ensureModel({ meals: SEED_MEALS.map(n=>({id:uid(),name:n,emoji:mealEmoji(n),source:''})), plan:{} }); saveData(state); }
   if(state.imported!==STARTER_VERSION){ importStarter(); }
+  initDrag();
   render();
 })();
 </script>
