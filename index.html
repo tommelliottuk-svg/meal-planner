@@ -635,7 +635,7 @@ let viewType='dinner';            // schedule cards show 'dinner' or 'lunch'
 let scheduleAnimated=false;       // first schedule paint animates; later ones don't (no flash on swap)
 let editingDate=null, editingType='dinner', chosenEmoji=null, emojiManual=false, outMode=false, officeChoice='';
 const DEFAULT_AISLES=['Fruit & veg','Bakery','Meat & fish','Dairy & eggs','Chilled','Frozen','Tins, jars & cooking','Pasta, rice & noodles','World foods','Herbs & spices','Snacks','Drinks','Household'];
-function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.notes=s.notes||{}; s.office=s.office||{}; s.shopping=s.shopping||[]; if(!Array.isArray(s.aisles)) s.aisles=DEFAULT_AISLES.slice(); return s; }
+function ensureModel(s){ s.meals=s.meals||[]; s.plan=s.plan||{}; s.lunch=s.lunch||{}; s.events=s.events||{}; s.lunchEvents=s.lunchEvents||{}; s.notes=s.notes||{}; s.office=s.office||{}; s.shopping=s.shopping||[]; if(!Array.isArray(s.aisles)) s.aisles=DEFAULT_AISLES.slice(); return s; }
 
 const SEED_MEALS=[
   'Spaghetti Bolognese','Chicken Curry','Tacos','Veggie Stir Fry',
@@ -773,7 +773,13 @@ function renderSchedule(){
     }
     const k=iso(d);
     const isToday=k===todayIso;
-    const ev = isDinner ? state.events[k] : null;
+    // "away" = out for dinner (events) OR no lunch needed (lunchEvents / inferred from an away day)
+    let ev;
+    if(isDinner){ ev = state.events[k]||null; }
+    else {
+      const hasLunch=!!findMeal(map[k]);
+      ev = hasLunch ? null : (state.lunchEvents[k] || state.events[k] || null);
+    }
     const meal = ev ? null : findMeal(map[k]);
     const otherMeal = findMeal(other[k]);
     const note = isDinner ? state.notes[k] : null;
@@ -783,14 +789,18 @@ function renderSchedule(){
     if(intro) el.style.animationDelay=Math.min(idx*10,260)+'ms';
     idx++;
     if(ev){
+      const awayTag = isDinner ? '🚫 Out — not cooking' : '🚫 Away — no lunch needed';
+      const otherLine = isDinner
+        ? (otherMeal?`<div class="sub-line">🥪 Lunch: ${escapeHtml(otherMeal.name)}</div>`:'')
+        : (otherMeal?`<div class="sub-line">🍽️ Dinner: ${escapeHtml(otherMeal.name)}</div>`:'');
       el.className='day event'+(isToday?' today':'');
       el.innerHTML=`
         <div class="datecol"><div class="dow">${DOW[d.getDay()]}</div><div class="dnum">${d.getDate()}</div></div>
         <div class="plate ev">🎈</div>
         <div class="body">
           <div class="meal-name">${escapeHtml(ev)}${flag}</div>
-          <span class="src-tag" style="--dot:#B23A66">🚫 Out — not cooking</span>
-          ${otherMeal?`<div class="sub-line">🥪 Lunch: ${escapeHtml(otherMeal.name)}</div>`:''}
+          <span class="src-tag" style="--dot:#B23A66">${awayTag}</span>
+          ${otherLine}
           ${badges(k, null)}
         </div>`;
     } else {
@@ -893,7 +903,9 @@ function setOut(on){
   document.getElementById('mealFields').style.display=on?'none':'block';
   document.getElementById('officeRow').style.display=on?'none':'block';
   const t=document.getElementById('outToggle');
-  t.textContent = on?'🚫 Out / not cooking — tap to switch back':'🍽️ Eating in (tap if you\'re out)';
+  const lunch=(editingType==='lunch');
+  if(on) t.textContent = lunch?'🚫 Away — no lunch needed (tap to switch back)':'🚫 Out / not cooking — tap to switch back';
+  else   t.textContent = lunch?'🥪 Having lunch (tap if away — no lunch)':'🍽️ Eating in (tap if you\'re out)';
   t.classList.toggle('on',on);
   if(on) setTimeout(()=>document.getElementById('eventInput').focus(),60);
 }
@@ -906,16 +918,18 @@ function openEditor(k){
   const d=parseISO(k);
   const isDinner=(viewType==='dinner');
   document.getElementById('sheetDate').textContent=`${DOW[d.getDay()]}, ${MON[d.getMonth()]} ${d.getDate()}`;
-  document.getElementById('outRow').style.display = isDinner?'block':'none';
+  document.getElementById('outRow').style.display = 'block';
   document.getElementById('noteWrap').style.display = isDinner?'block':'none';
   document.getElementById('officeRow').style.display = 'block';
   setOffice(state.office[k]||'');
   const ingHint=document.getElementById('ingHint'); if(ingHint) ingHint.textContent='';
   const map = isDinner?state.plan:state.lunch;
   const meal=findMeal(map[k]);
-  const ev = isDinner ? (state.events[k]||'') : '';
+  let awayLabel='';
+  if(isDinner){ awayLabel = state.events[k]||''; }
+  else if(!meal){ awayLabel = state.lunchEvents[k] || state.events[k] || ''; }
   document.getElementById('sheetKicker').textContent =
-    isDinner ? ((meal||ev)?'Edit dinner':'Plan dinner') : (meal?'Edit lunch':'Plan lunch');
+    isDinner ? ((meal||awayLabel)?'Edit dinner':'Plan dinner') : ((meal||awayLabel)?'Edit lunch':'Plan lunch');
   const input=document.getElementById('mealInput');
   input.placeholder = isDinner?"What's for dinner?":"What's for lunch?";
   input.value = meal?meal.name:'';
@@ -924,14 +938,12 @@ function openEditor(k){
   updatePreview(); buildEmojiPicker(); buildRepeatChips();
   document.getElementById('srcSelect').value = meal?(meal.source||''):'';
   document.getElementById('urlInput').value = meal?(meal.url||''):'';
-  if(isDinner){
-    document.getElementById('eventInput').value = ev;
-    document.getElementById('noteInput').value = state.notes[k]||'';
-    setOut(!!ev);
-  } else { setOut(false); }
-  document.getElementById('clearBtn').style.display = (meal||ev)?'block':'none';
+  document.getElementById('eventInput').value = awayLabel;
+  if(isDinner) document.getElementById('noteInput').value = state.notes[k]||'';
+  setOut(!!awayLabel);
+  document.getElementById('clearBtn').style.display = (meal||awayLabel)?'block':'none';
   openSheet();
-  setTimeout(()=>{ if(!meal && !ev) input.focus(); },280);
+  setTimeout(()=>{ if(!meal && !awayLabel) input.focus(); },280);
 }
 function updatePreview(){
   document.getElementById('previewPlate').textContent = chosenEmoji||'🍽️';
@@ -992,9 +1004,15 @@ function saveEditor(){
     }
     if(note) state.notes[k]=note; else delete state.notes[k];
   } else {
-    const name=document.getElementById('mealInput').value.trim();
-    if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; m.url=url; state.lunch[k]=m.id; }
-    else { delete state.lunch[k]; }
+    if(outMode){
+      const ev=document.getElementById('eventInput').value.trim();
+      if(ev){ state.lunchEvents[k]=ev; delete state.lunch[k]; } else { delete state.lunchEvents[k]; }
+    } else {
+      delete state.lunchEvents[k];
+      const name=document.getElementById('mealInput').value.trim();
+      if(name){ const m=ensureMeal(name, chosenEmoji); if(emojiManual){m.emoji=chosenEmoji;m._emojiLocked=true;} m.source=document.getElementById('srcSelect').value||''; m.url=url; state.lunch[k]=m.id; }
+      else { delete state.lunch[k]; }
+    }
   }
   if(officeChoice) state.office[k]=officeChoice; else delete state.office[k];
   saveData(state); render(); closeSheet();
@@ -1003,7 +1021,7 @@ function clearDay(){
   const k=editingDate;
   if(k){
     if(editingType==='dinner'){ delete state.plan[k]; delete state.events[k]; delete state.notes[k]; }
-    else { delete state.lunch[k]; }
+    else { delete state.lunch[k]; delete state.lunchEvents[k]; }
     saveData(state); render();
   }
   closeSheet();
