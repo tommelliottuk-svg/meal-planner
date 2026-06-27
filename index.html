@@ -97,6 +97,14 @@
   .day:hover{transform:translateY(-1px)}
   .day:focus-within{border-color:var(--jam)}
 
+  /* undo */
+  .undo-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:60;
+    appearance:none;border:1px solid var(--line);background:var(--card);color:var(--ink);
+    font:inherit;font-weight:800;font-size:14px;padding:11px 17px;border-radius:999px;
+    box-shadow:0 8px 24px rgba(40,20,10,.18);cursor:pointer}
+  .undo-fab[hidden]{display:none}
+  .undo-fab:active{transform:scale(.96)}
+
   /* drag & drop */
   .drag-handle{flex:none;display:flex;align-items:center;justify-content:center;width:30px;align-self:stretch;
     padding:0;margin:0;border:0;background:none;color:var(--line);cursor:grab;touch-action:none;border-radius:10px}
@@ -383,6 +391,8 @@
     <button class="conn-chip warn" id="connChip" title="Tap for connection help">⚠️ This device only</button>
   </div>
 
+  <button class="undo-fab" id="undoBtn" hidden>↶ Undo</button>
+
   <main>
     <section class="schedwrap" id="schedWrap"></section>
 
@@ -602,7 +612,25 @@ async function loadData(){
   return mem;
 }
 let saveTimer=null;
+/* ---------- undo ---------- */
+let undoStack=[], committedJSON=null;
+function snap(s){ const c=Object.assign({},s); delete c.meta; return JSON.stringify(c); }
+function refreshUndo(){ const b=document.getElementById('undoBtn'); if(b) b.hidden = undoStack.length===0; }
+function doUndo(){
+  if(!undoStack.length) return;
+  const restore=undoStack.pop();
+  let parsed; try{ parsed=JSON.parse(restore); }catch(e){ return; }
+  state=ensureModel(parsed);
+  committedJSON=restore;          // mark restored state as current so the save below doesn't re-capture it
+  saveData(state);
+  render(); refreshUndo();
+}
+
 async function saveData(data){
+  const cur=snap(data);
+  if(committedJSON!==null && committedJSON!==cur){ undoStack.push(committedJSON); if(undoStack.length>40) undoStack.shift(); }
+  committedJSON=cur;
+  refreshUndo();
   data.meta={by:myName||null, at:Date.now()};
   mem=data;
   renderMeta();
@@ -881,7 +909,7 @@ function initDrag(){
     handle.setPointerCapture(e.pointerId);
     drag={ key:card.dataset.key, card, handle, pointerId:e.pointerId,
            startX:e.clientX, startY:e.clientY, dx:e.clientX-rect.left, dy:e.clientY-rect.top,
-           w:rect.width, active:false, ghost:null, target:null };
+           w:rect.width, active:false, ghost:null, target:null, lastX:e.clientX, lastY:e.clientY, raf:0 };
     handle.addEventListener('pointermove', onDragMove);
     handle.addEventListener('pointerup', onDragEnd);
     handle.addEventListener('pointercancel', onDragEnd);
@@ -898,10 +926,15 @@ function onDragMove(e){
     g.style.width=drag.w+'px';
     document.body.appendChild(g);
     drag.ghost=g;
+    drag.raf=requestAnimationFrame(autoScroll);
   }
   e.preventDefault();
+  drag.lastX=e.clientX; drag.lastY=e.clientY;
   if(drag.ghost) drag.ghost.style.transform=`translate(${e.clientX-drag.dx}px, ${e.clientY-drag.dy}px)`;
-  const el=document.elementFromPoint(e.clientX, e.clientY);
+  updateTarget(e.clientX, e.clientY);
+}
+function updateTarget(x,y){
+  const el=document.elementFromPoint(x,y);
   const card=el && el.closest('.day');
   let tgt=null;
   if(card && card!==drag.card && card.dataset.key && !card.dataset.locked) tgt=card;
@@ -909,9 +942,22 @@ function onDragMove(e){
   if(tgt) tgt.classList.add('drop-target');
   drag.target=tgt;
 }
+function autoScroll(){
+  if(!drag || !drag.active) return;
+  const y=drag.lastY, h=window.innerHeight, edge=90;
+  let dy=0;
+  if(y<edge)            dy = -(4 + Math.round((edge-y)/edge*16));
+  else if(y>h-edge)     dy =  (4 + Math.round((y-(h-edge))/edge*16));
+  if(dy){
+    window.scrollBy(0, dy);
+    updateTarget(drag.lastX, drag.lastY);
+  }
+  drag.raf=requestAnimationFrame(autoScroll);
+}
 function onDragEnd(){
   if(!drag) return;
   const d=drag; drag=null;
+  if(d.raf) cancelAnimationFrame(d.raf);
   try{ d.handle.releasePointerCapture(d.pointerId); }catch(e){}
   d.handle.removeEventListener('pointermove', onDragMove);
   d.handle.removeEventListener('pointerup', onDragEnd);
@@ -1360,6 +1406,8 @@ document.getElementById('shopInput').addEventListener('keydown',e=>{if(e.key==='
 document.getElementById('aisleSave').addEventListener('click',saveAisles);
 document.getElementById('youChip').addEventListener('click',setMyName);
 document.getElementById('connChip').addEventListener('click',connHelp);
+document.getElementById('undoBtn').addEventListener('click',doUndo);
+document.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&(e.key==='z'||e.key==='Z')){ e.preventDefault(); doUndo(); }});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
 
 /* ---------- boot ---------- */
@@ -1370,6 +1418,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();});
   if(saved && saved.meals){ state=ensureModel(saved); }
   else { state=ensureModel({ meals: SEED_MEALS.map(n=>({id:uid(),name:n,emoji:mealEmoji(n),source:''})), plan:{} }); saveData(state); }
   if(state.imported!==STARTER_VERSION){ importStarter(); }
+  committedJSON=snap(state); undoStack=[]; refreshUndo();
   initDrag();
   render();
 })();
